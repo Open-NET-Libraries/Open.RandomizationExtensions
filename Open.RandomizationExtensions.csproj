@@ -2,6 +2,18 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <Description>
+A useful set of extensions for randomly selecting from sets.
+
+Part of the "Open" set of libraries.</Description>
+    <Copyright>https://github.com/electricessence/Open.Open.RandomizationExtensions/blob/master/LICENSE</Copyright>
+    <PackageProjectUrl>https://github.com/electricessence/Open.RandomizationExtensions</PackageProjectUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/electricessence/Open.RandomizationExtensions</RepositoryUrl>
+    <RepositoryType>Git</RepositoryType>
+    <PackageTags>random select</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
