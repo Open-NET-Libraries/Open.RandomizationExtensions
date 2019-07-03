@@ -14,7 +14,7 @@ Part of the "Open" set of libraries.</Description>
     <RepositoryUrl>https://github.com/electricessence/Open.RandomizationExtensions</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>random select</PackageTags>
-    <Version>1.1.0</Version>
+    <Version>1.1.1</Version>
   </PropertyGroup>
 
   <ItemGroup>
