@@ -3,6 +3,7 @@
  * Licensing: MIT https://github.com/electricessence/Genetic-Algorithm-Platform/blob/master/LICENSE.md
  */
 
+using Open.Memory;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -138,29 +139,29 @@ namespace Open.RandomizationExtensions
 				return -1;
 
 			HashSet<T> setCreated = null;
-			var exclusionSet = exclusion == null ? default
-				: exclusion as ISet<T> ?? (setCreated = new HashSet<T>(exclusion));
-
-			if (exclusionSet == null || exclusionSet.Count == 0)
-				return R.Value.Next(source.Length);
-
-			var count = source.Length;
-			var pool = count > 1048576 ? null : ArrayPool<int>.Shared;
-			var indexes = pool?.Rent(count) ?? new int[count];
-
 			try
 			{
-				var indexCount = 0;
-				for (var i = 0; i < count; ++i)
+				var exclusionSet = exclusion == null ? default
+					: exclusion as ISet<T> ?? (setCreated = new HashSet<T>(exclusion));
+
+				if (exclusionSet == null || exclusionSet.Count == 0)
+					return R.Value.Next(source.Length);
+
+				var count = source.Length;
+				using (var indexesTemp = ArrayPool<int>.Shared.RentDisposable(count))
 				{
-					if (!exclusionSet.Contains(source[i]))
-						indexes[indexCount++] = i;
+					var indexes = indexesTemp.Array;
+					var indexCount = 0;
+					for (var i = 0; i < count; ++i)
+					{
+						if (!exclusionSet.Contains(source[i]))
+							indexes[indexCount++] = i;
+					}
+					return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
 				}
-				return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
 			}
 			finally
 			{
-				pool?.Return(indexes);
 				setCreated?.Clear();
 			}
 		}
@@ -190,31 +191,30 @@ namespace Open.RandomizationExtensions
 				return -1;
 
 			HashSet<T> setCreated = null;
-			var exclusionSet = exclusion == null ? default
-				: exclusion as ISet<T> ?? (setCreated = new HashSet<T>(exclusion));
-
-			if (exclusionSet == null || exclusionSet.Count == 0)
-				return R.Value.Next(source.Count);
-
-			var count = source.Count;
-			var pool = count > 1048576 ? null : ArrayPool<int>.Shared;
-			var indexes = pool?.Rent(count) ?? new int[count];
-
 			try
 			{
-				var i = -1;
-				var indexCount = 0;
-				foreach (var value in source)
+				var exclusionSet = exclusion == null ? default
+				: exclusion as ISet<T> ?? (setCreated = new HashSet<T>(exclusion));
+
+				if (exclusionSet == null || exclusionSet.Count == 0)
+					return R.Value.Next(source.Count);
+
+				using (var indexesTemp = ArrayPool<int>.Shared.RentDisposable(source.Count))
 				{
-					++i;
-					if (!exclusionSet.Contains(value))
-						indexes[indexCount++] = i;
+					var indexes = indexesTemp.Array;
+					var i = -1;
+					var indexCount = 0;
+					foreach (var value in source)
+					{
+						++i;
+						if (!exclusionSet.Contains(value))
+							indexes[indexCount++] = i;
+					}
+					return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
 				}
-				return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
 			}
 			finally
 			{
-				pool?.Return(indexes);
 				setCreated?.Clear();
 			}
 		}
@@ -247,22 +247,16 @@ namespace Open.RandomizationExtensions
 			}
 
 			var count = source.Length;
-			var pool = count > 1048576 ? null : ArrayPool<int>.Shared;
-			var indexes = pool?.Rent(count) ?? new int[count];
-
-			try
+			using (var indexesTemp = ArrayPool<int>.Shared.RentDisposable(count))
 			{
+				var indexes = indexesTemp.Array;
 				var indexCount = 0;
-				for (var i = 0; i < source.Length; i++)
+				for (var i = 0; i < count; i++)
 				{
 					if (!exclusion.Equals(source[i]))
 						indexes[indexCount++] = i;
 				}
 				return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
-			}
-			finally
-			{
-				pool?.Return(indexes);
 			}
 		}
 
@@ -305,12 +299,9 @@ namespace Open.RandomizationExtensions
 				}
 			}
 
-			var count = source.Count;
-			var pool = count > 1048576 ? null : ArrayPool<int>.Shared;
-			var indexes = pool?.Rent(count) ?? new int[count];
-
-			try
+			using (var indexesTemp = ArrayPool<int>.Shared.RentDisposable(source.Count))
 			{
+				var indexes = indexesTemp.Array;
 				var i = -1;
 				var indexCount = 0;
 				foreach (var value in source)
@@ -320,10 +311,6 @@ namespace Open.RandomizationExtensions
 						indexes[indexCount++] = i;
 				}
 				return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
-			}
-			finally
-			{
-				pool?.Return(indexes);
 			}
 		}
 
@@ -563,31 +550,32 @@ namespace Open.RandomizationExtensions
 				throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
 			HashSet<ushort> setCreated = null;
-			var exclusionSet = exclusion == null ? null
-				: exclusion as ISet<ushort> ?? (setCreated = new HashSet<ushort>(exclusion));
-
-			if (exclusionSet == null || exclusionSet.Count == 0)
-				return (ushort)R.Value.Next(range);
-
-			var pool = ArrayPool<ushort>.Shared;
-			var indexes = pool?.Rent(range) ?? new ushort[range];
-
 			try
 			{
-				var indexCount = 0;
-				for (ushort i = 0; i < range; ++i)
-				{
-					if (!exclusionSet.Contains(i))
-						indexes[indexCount++] = i;
-				}
-				if(indexCount==0)
-					throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
+				var exclusionSet = exclusion == null ? null
+				: exclusion as ISet<ushort> ?? (setCreated = new HashSet<ushort>(exclusion));
 
-				return indexes[R.Value.Next(indexCount)];
+				if (exclusionSet == null || exclusionSet.Count == 0)
+					return (ushort)R.Value.Next(range);
+
+				using (var indexesTemp = ArrayPool<ushort>.Shared.RentDisposable(range))
+				{
+					var indexes = indexesTemp.Array;
+
+					var indexCount = 0;
+					for (ushort i = 0; i < range; ++i)
+					{
+						if (!exclusionSet.Contains(i))
+							indexes[indexCount++] = i;
+					}
+					if (indexCount == 0)
+						throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
+
+					return indexes[R.Value.Next(indexCount)];
+				}
 			}
 			finally
 			{
-				pool.Return(indexes);
 				setCreated?.Clear();
 			}
 		}
@@ -606,30 +594,30 @@ namespace Open.RandomizationExtensions
 				throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
 			HashSet<int> setCreated = null;
-			var exclusionSet = exclusion == null ? null
-				: exclusion as ISet<int> ?? (setCreated = new HashSet<int>(exclusion));
-
-			if (exclusionSet == null || exclusionSet.Count == 0)
-				return R.Value.Next(range);
-
-			var pool = range > 1048576 ? null : ArrayPool<int>.Shared;
-			var indexes = pool?.Rent(range) ?? new int[range];
-
 			try
 			{
-				var indexCount = 0;
-				for (var i = 0; i < range; ++i)
+				var exclusionSet = exclusion == null ? null
+				: exclusion as ISet<int> ?? (setCreated = new HashSet<int>(exclusion));
+
+				if (exclusionSet == null || exclusionSet.Count == 0)
+					return R.Value.Next(range);
+
+				using (var indexesTemp = ArrayPool<int>.Shared.RentDisposable(range))
 				{
-					if (!exclusionSet.Contains(i))
-						indexes[indexCount++] = i;
+					var indexes = indexesTemp.Array;
+					var indexCount = 0;
+					for (var i = 0; i < range; ++i)
+					{
+						if (!exclusionSet.Contains(i))
+							indexes[indexCount++] = i;
+					}
+					if (indexCount == 0)
+						throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
+					return indexes[R.Value.Next(indexCount)];
 				}
-				if(indexCount==0)
-					throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
-				return indexes[R.Value.Next(indexCount)];
 			}
 			finally
 			{
-				pool?.Return(indexes);
 				setCreated?.Clear();
 			}
 		}
