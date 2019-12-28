@@ -11,7 +11,8 @@ using System.Linq;
 
 namespace Open.RandomizationExtensions
 {
-	public static class Extensions
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0059:Unnecessary assignment of a value", Justification = "Value is actually used.")]
+	public static class Randomizer
 	{
 		static readonly Lazy<Random> R = new Lazy<Random>(() => new Random());
 
@@ -28,11 +29,11 @@ namespace Open.RandomizationExtensions
 		/// <param name="value">The value retrieved.</param>
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <returns>True if successfully retrieved and item and removed the node.</returns>
-		public static bool TryRandomPluck<T>(this LinkedList<T> source, out T value, Random random = null)
+		public static bool TryRandomPluck<T>(this LinkedList<T> source, out T value, Random? random = null)
 		{
 			if (source.Count == 0)
 			{
-				value = default;
+				value = default!;
 				return false;
 			}
 
@@ -52,7 +53,7 @@ namespace Open.RandomizationExtensions
 		/// <param name="source">The source linked list.</param>
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <returns>The value retrieved.</returns>
-		public static T RandomPluck<T>(this LinkedList<T> source, Random random = null)
+		public static T RandomPluck<T>(this LinkedList<T> source, Random? random = null)
 		{
 			if (source.TryRandomPluck(out var value, random))
 				return value;
@@ -68,11 +69,11 @@ namespace Open.RandomizationExtensions
 		/// <param name="value">The value removed.</param>
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <returns>True if successfully removed.</returns>
-		public static bool TryRandomPluck<T>(this List<T> source, out T value, Random random = null)
+		public static bool TryRandomPluck<T>(this List<T> source, out T value, Random? random = null)
 		{
 			if (source.Count == 0)
 			{
-				value = default;
+				value = default!;
 				return false;
 			}
 
@@ -89,7 +90,7 @@ namespace Open.RandomizationExtensions
 		/// <param name="source">The source list.</param>
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <returns>The value retrieved.</returns>
-		public static T RandomPluck<T>(this List<T> source, Random random = null)
+		public static T RandomPluck<T>(this List<T> source, Random? random = null)
 		{
 			if (source.TryRandomPluck(out var value, random))
 				return value;
@@ -105,7 +106,7 @@ namespace Open.RandomizationExtensions
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <returns>The reference selected.</returns>
 		public static ref readonly T RandomSelectOne<T>(
-			this in ReadOnlySpan<T> source, Random random = null)
+			this in ReadOnlySpan<T> source, Random? random = null)
 		{
 			if (source.Length == 0)
 				throw new InvalidOperationException("Source collection is empty.");
@@ -121,7 +122,7 @@ namespace Open.RandomizationExtensions
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <returns>The reference selected.</returns>
 		public static ref T RandomSelectOne<T>(
-			this in Span<T> source, Random random = null)
+			this in Span<T> source, Random? random = null)
 		{
 			if (source.Length == 0)
 				throw new InvalidOperationException("Source collection is empty.");
@@ -146,16 +147,16 @@ namespace Open.RandomizationExtensions
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <param name="exclusion">The optional values to exclude from selection.</param>
 		/// <returns>The index selected.</returns>
-		public static int RandomSelectIndex<T>(this in ReadOnlySpan<T> source, Random random = null, IEnumerable<T> exclusion = null)
+		public static int RandomSelectIndex<T>(this in ReadOnlySpan<T> source, Random? random = null, IEnumerable<T>? exclusion = null)
 		{
 			if (source.Length == 0)
 				return -1;
 
-			HashSet<T> setCreated = null;
+			DeferredHashSet<T>? setCreated = null;
 			try
 			{
 				var exclusionSet = exclusion == null || exclusion is ICollection<T> c && c.Count == 0 ? default
-					: exclusion as ISet<T> ?? (setCreated = new HashSet<T>(exclusion));
+					: exclusion as ISet<T> ?? (setCreated = new DeferredHashSet<T>(exclusion));
 
 				if (exclusionSet == null || exclusionSet.Count == 0)
 					return (random ?? R.Value).Next(source.Length);
@@ -164,22 +165,20 @@ namespace Open.RandomizationExtensions
 					return RandomSelectIndexExcept(in source, random, exclusionSet.Single());
 
 				var count = source.Length;
-				using (var temp = ArrayPool<int>.Shared.RentDisposable(count))
+				using var temp = ArrayPool<int>.Shared.RentDisposable(count);
+				var indexes = temp.Array;
+				var indexCount = 0;
+				for (var i = 0; i < count; ++i)
 				{
-					var indexes = temp.Array;
-					var indexCount = 0;
-					for (var i = 0; i < count; ++i)
-					{
-						if (!exclusionSet.Contains(source[i]))
-							indexes[indexCount++] = i;
-					}
-					return indexCount == 0 ? -1
-						: indexes[(random ?? R.Value).Next(indexCount)];
+					if (!exclusionSet.Contains(source[i]))
+						indexes[indexCount++] = i;
 				}
+				return indexCount == 0 ? -1
+					: indexes[(random ?? R.Value).Next(indexCount)];
 			}
 			finally
 			{
-				setCreated?.Clear();
+				setCreated?.Dispose();
 			}
 		}
 
@@ -204,7 +203,7 @@ namespace Open.RandomizationExtensions
 		/// <param name="excluding">The value to exclude from selection.</param>
 		/// <param name="others">The optional values to exclude from selection.</param>
 		/// <returns>The index selected.</returns>
-		public static int RandomSelectIndexExcept<T>(this in ReadOnlySpan<T> source, Random random, T excluding, params T[] others)
+		public static int RandomSelectIndexExcept<T>(this in ReadOnlySpan<T> source, Random? random, T excluding, params T[] others)
 		{
 			if (source.Length == 0)
 				return -1;
@@ -212,19 +211,18 @@ namespace Open.RandomizationExtensions
 			if (others.Length != 0)
 				return RandomSelectIndex(in source, random, Combined(excluding, others));
 
-			using (var temp = ArrayPool<int>.Shared.RentDisposable(others.Length))
+			using var temp = ArrayPool<int>.Shared.RentDisposable(others.Length);
+			var indexes = temp.Array;
+			var i = -1;
+			var indexCount = 0;
+			foreach (var value in source)
 			{
-				var indexes = temp.Array;
-				var i = -1;
-				var indexCount = 0;
-				foreach (var value in source)
-				{
-					++i;
-					if (!excluding.Equals(value))
-						indexes[indexCount++] = i;
-				}
-				return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
+				++i;
+				bool equals = excluding is null ? value is null : excluding.Equals(value);
+				if (!equals)
+					indexes[indexCount++] = i;
 			}
+			return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
 		}
 
 		/// <summary>
@@ -248,7 +246,7 @@ namespace Open.RandomizationExtensions
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <param name="exclusion">The optional values to exclude from selection.</param>
 		/// <returns>The index selected.</returns>
-		public static int RandomSelectIndex<T>(this in Span<T> source, Random random = null, IEnumerable<T> exclusion = null)
+		public static int RandomSelectIndex<T>(this in Span<T> source, Random? random = null, IEnumerable<T>? exclusion = null)
 			=> RandomSelectIndex((ReadOnlySpan<T>)source, random, exclusion);
 
 		/// <summary>
@@ -287,16 +285,16 @@ namespace Open.RandomizationExtensions
 		public static int RandomSelectIndexExcept<T>(this in Span<T> source, T excluding, params T[] others)
 			=> RandomSelectIndexExcept((ReadOnlySpan<T>)source, default, excluding, others);
 
-		static int RandomSelectIndex<T>(Random random, int count, IEnumerable<T> source, IEnumerable<T> exclusion)
+		static int RandomSelectIndex<T>(Random? random, int count, IEnumerable<T> source, IEnumerable<T>? exclusion)
 		{
 			if (count == 0)
 				return -1;
 
-			HashSet<T> setCreated = null;
+			DeferredHashSet<T>? setCreated = null;
 			try
 			{
 				var exclusionSet = exclusion == null ? default
-					: exclusion as ISet<T> ?? (setCreated = new HashSet<T>(exclusion));
+					: exclusion as ISet<T> ?? (setCreated = new DeferredHashSet<T>(exclusion));
 
 				if (exclusionSet == null || exclusionSet.Count == 0)
 					return (random ?? R.Value).Next(count);
@@ -304,24 +302,44 @@ namespace Open.RandomizationExtensions
 				if (exclusionSet.Count == 1)
 					return RandomSelectIndexExcept(random, count, source, exclusionSet.Single());
 
-				using (var indexesTemp = ArrayPool<int>.Shared.RentDisposable(count))
+				using var indexesTemp = ArrayPool<int>.Shared.RentDisposable(count);
+				var indexes = indexesTemp.Array;
+				var i = -1;
+				var indexCount = 0;
+				foreach (var value in source)
 				{
-					var indexes = indexesTemp.Array;
-					var i = -1;
-					var indexCount = 0;
-					foreach (var value in source)
-					{
-						++i;
-						if (!exclusionSet.Contains(value))
-							indexes[indexCount++] = i;
-					}
-					return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
+					++i;
+					if (!exclusionSet.Contains(value))
+						indexes[indexCount++] = i;
 				}
+				return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
 			}
 			finally
 			{
-				setCreated?.Clear();
+				setCreated?.Dispose();
 			}
+		}
+
+		static int RandomSelectIndexExcept<T>(Random? random, int count, IEnumerable<T> source, T excluding, params T[] others)
+		{
+			if (count == 0)
+				return -1;
+
+			if (others.Length != 0)
+				RandomSelectIndex(random, count, source, Combined(excluding, others));
+
+			using var indexesTemp = ArrayPool<int>.Shared.RentDisposable(count);
+			var indexes = indexesTemp.Array;
+			var i = -1;
+			var indexCount = 0;
+			foreach (var value in source)
+			{
+				++i;
+				bool equals = excluding is null ? value is null : excluding.Equals(value);
+				if (!equals)
+					indexes[indexCount++] = i;
+			}
+			return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
 		}
 
 		/// <summary>
@@ -333,31 +351,8 @@ namespace Open.RandomizationExtensions
 		/// <param name="random">The optional source of random numbers.</param>
 		/// <param name="exclusion">The optional values to exclude from selection.</param>
 		/// <returns>The index selected.</returns>
-		public static int RandomSelectIndex<T>(this IReadOnlyCollection<T> source, Random random = null, IEnumerable<T> exclusion = null)
+		public static int RandomSelectIndex<T>(this IReadOnlyCollection<T> source, Random? random = null, IEnumerable<T>? exclusion = null)
 			=> RandomSelectIndex(random, source.Count, source, exclusion);
-
-		static int RandomSelectIndexExcept<T>(Random random, int count, IEnumerable<T> source, T exclusion, params T[] others)
-		{
-			if (count == 0)
-				return -1;
-
-			if (others.Length != 0)
-				RandomSelectIndex(random, count, source, Combined(exclusion, others));
-
-			using (var indexesTemp = ArrayPool<int>.Shared.RentDisposable(count))
-			{
-				var indexes = indexesTemp.Array;
-				var i = -1;
-				var indexCount = 0;
-				foreach (var value in source)
-				{
-					++i;
-					if (!exclusion.Equals(value))
-						indexes[indexCount++] = i;
-				}
-				return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
-			}
-		}
 
 		/// <summary>
 		/// Randomly selects an index from the source.
@@ -397,13 +392,13 @@ namespace Open.RandomizationExtensions
 		public static bool TryRandomSelectOne<T>(
 			this in ReadOnlySpan<T> source,
 			out T value,
-			Random random = null,
-			IEnumerable<T> exclusion = null)
+			Random? random = null,
+			IEnumerable<T>? exclusion = null)
 		{
 			var index = RandomSelectIndex(in source, random, exclusion);
 			if (index == -1)
 			{
-				value = default;
+				value = default!;
 				return false;
 			}
 
@@ -439,8 +434,8 @@ namespace Open.RandomizationExtensions
 		public static bool TryRandomSelectOne<T>(
 			this in Span<T> source,
 			out T value,
-			Random random = null,
-			IEnumerable<T> exclusion = null)
+			Random? random = null,
+			IEnumerable<T>? exclusion = null)
 			=> TryRandomSelectOne((ReadOnlySpan<T>)source, out value, random, exclusion);
 
 		/// <summary>
@@ -458,7 +453,7 @@ namespace Open.RandomizationExtensions
 			IEnumerable<T> exclusion)
 			=> TryRandomSelectOne((ReadOnlySpan<T>)source, out value, null, exclusion);
 
-		static T GetElementAt<T>(IReadOnlyCollection<T> source, int index)
+		static T GetElementAt<T>(IEnumerable<T> source, int index)
 		{
 			if (source is IList<T> list1)
 				return list1[index];
@@ -480,8 +475,8 @@ namespace Open.RandomizationExtensions
 		/// <returns>The value selected.</returns>
 		public static T RandomSelectOne<T>(
 			this IReadOnlyCollection<T> source,
-			Random random = null,
-			IEnumerable<T> exclusion = null)
+			Random? random = null,
+			IEnumerable<T>? exclusion = null)
 		{
 			if (source.Count == 0)
 				throw new InvalidOperationException("Source collection is empty.");
@@ -519,13 +514,13 @@ namespace Open.RandomizationExtensions
 		public static bool TryRandomSelectOne<T>(
 			this IReadOnlyCollection<T> source,
 			out T value,
-			Random random = null,
-			IEnumerable<T> exclusion = null)
+			Random? random = null,
+			IEnumerable<T>? exclusion = null)
 		{
 			var index = RandomSelectIndex(random, source.Count, source, exclusion);
 			if (index == -1)
 			{
-				value = default;
+				value = default!;
 				return false;
 			}
 
@@ -563,13 +558,13 @@ namespace Open.RandomizationExtensions
 		public static bool TryRandomSelectOneExcept<T>(
 			this in ReadOnlySpan<T> source,
 			out T value,
-			Random random,
+			Random? random,
 			T excluding, params T[] others)
 		{
 			var index = RandomSelectIndexExcept(in source, random, excluding, others);
 			if (index == -1)
 			{
-				value = default;
+				value = default!;
 				return false;
 			}
 
@@ -606,7 +601,7 @@ namespace Open.RandomizationExtensions
 		public static bool TryRandomSelectOneExcept<T>(
 			this in Span<T> source,
 			out T value,
-			Random random,
+			Random? random,
 			T excluding, params T[] others)
 			=> TryRandomSelectOneExcept((ReadOnlySpan<T>)source, out value, random, excluding, others);
 
@@ -624,13 +619,13 @@ namespace Open.RandomizationExtensions
 		public static bool TryRandomSelectOneExcept<T>(
 			this IReadOnlyCollection<T> source,
 			out T value,
-			Random random,
+			Random? random,
 			T excluding, params T[] others)
 		{
 			var index = RandomSelectIndexExcept(random, source.Count, source, excluding, others);
 			if (index == -1)
 			{
-				value = default;
+				value = default!;
 				return false;
 			}
 
@@ -667,7 +662,7 @@ namespace Open.RandomizationExtensions
 		/// <returns>The value selected.</returns>
 		public static T RandomSelectOneExcept<T>(
 			this in ReadOnlySpan<T> source,
-			Random random,
+			Random? random,
 			T excluding, params T[] others)
 		{
 			if (source.Length == 0)
@@ -705,7 +700,7 @@ namespace Open.RandomizationExtensions
 		/// <returns>The value selected.</returns>
 		public static T RandomSelectOneExcept<T>(
 			this in Span<T> source,
-			Random random,
+			Random? random,
 			T excluding, params T[] others)
 			=> RandomSelectOneExcept((ReadOnlySpan<T>)source, random, excluding, others);
 
@@ -735,7 +730,7 @@ namespace Open.RandomizationExtensions
 		/// <returns>The value selected.</returns>
 		public static T RandomSelectOneExcept<T>(
 			this IReadOnlyCollection<T> source,
-			Random random,
+			Random? random,
 			T excluding, params T[] others)
 		{
 			if (source.Count == 0)
@@ -767,17 +762,6 @@ namespace Open.RandomizationExtensions
 		/// <param name="range">The range of values to select from.</param>
 		/// <param name="exclusion">The values to exclude.</param>
 		/// <returns>The value selected.</returns>
-		public static ushort NextRandomIntegerExcluding(
-			ushort range,
-			IEnumerable<ushort> exclusion)
-			=> R.Value.NextExcluding(range, exclusion);
-
-		/// <summary>
-		/// Select a random number except the excluded ones.
-		/// </summary>
-		/// <param name="range">The range of values to select from.</param>
-		/// <param name="exclusion">The values to exclude.</param>
-		/// <returns>The value selected.</returns>
 		public static ushort NextExcluding(this Random source,
 			ushort range,
 			IEnumerable<ushort> exclusion)
@@ -785,47 +769,34 @@ namespace Open.RandomizationExtensions
 			if (range == 0)
 				throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
-			HashSet<ushort> setCreated = null;
+			DeferredHashSet<ushort>? setCreated = null;
 			try
 			{
 				var exclusionSet = exclusion == null ? null
-				: exclusion as ISet<ushort> ?? (setCreated = new HashSet<ushort>(exclusion));
+					: exclusion as ISet<ushort> ?? (setCreated = new DeferredHashSet<ushort>(exclusion));
 
 				if (exclusionSet == null || exclusionSet.Count == 0)
 					return (ushort)source.Next(range);
 
-				using (var indexesTemp = ArrayPool<ushort>.Shared.RentDisposable(range))
+				using var indexesTemp = ArrayPool<ushort>.Shared.RentDisposable(range);
+				var indexes = indexesTemp.Array;
+
+				var indexCount = 0;
+				for (ushort i = 0; i < range; ++i)
 				{
-					var indexes = indexesTemp.Array;
-
-					var indexCount = 0;
-					for (ushort i = 0; i < range; ++i)
-					{
-						if (!exclusionSet.Contains(i))
-							indexes[indexCount++] = i;
-					}
-					if (indexCount == 0)
-						throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
-
-					return indexes[source.Next(indexCount)];
+					if (!exclusionSet.Contains(i))
+						indexes[indexCount++] = i;
 				}
+				if (indexCount == 0)
+					throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
+
+				return indexes[source.Next(indexCount)];
 			}
 			finally
 			{
-				setCreated?.Clear();
+				setCreated?.Dispose();
 			}
 		}
-
-		/// <summary>
-		/// Select a random number except the excluded ones.
-		/// </summary>
-		/// <param name="range">The range of values to select from.</param>
-		/// <param name="exclusion">The values to exclude.</param>
-		/// <returns>The value selected.</returns>
-		public static int NextRandomIntegerExcluding(
-			int range,
-			IEnumerable<int> exclusion)
-			=> R.Value.NextExcluding(range, exclusion);
 
 		/// <summary>
 		/// Select a random number except the excluded ones.
@@ -840,45 +811,32 @@ namespace Open.RandomizationExtensions
 			if (range <= 0)
 				throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
-			HashSet<int> setCreated = null;
+			DeferredHashSet<int>? setCreated = null;
 			try
 			{
 				var exclusionSet = exclusion == null ? null
-					: exclusion as ISet<int> ?? (setCreated = new HashSet<int>(exclusion));
+					: exclusion as ISet<int> ?? (setCreated = new DeferredHashSet<int>(exclusion));
 
 				if (exclusionSet == null || exclusionSet.Count == 0)
 					return source.Next(range);
 
-				using (var indexesTemp = ArrayPool<int>.Shared.RentDisposable(range))
+				using var indexesTemp = ArrayPool<int>.Shared.RentDisposable(range);
+				var indexes = indexesTemp.Array;
+				var indexCount = 0;
+				for (var i = 0; i < range; ++i)
 				{
-					var indexes = indexesTemp.Array;
-					var indexCount = 0;
-					for (var i = 0; i < range; ++i)
-					{
-						if (!exclusionSet.Contains(i))
-							indexes[indexCount++] = i;
-					}
-					if (indexCount == 0)
-						throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
-					return indexes[source.Next(indexCount)];
+					if (!exclusionSet.Contains(i))
+						indexes[indexCount++] = i;
 				}
+				if (indexCount == 0)
+					throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
+				return indexes[source.Next(indexCount)];
 			}
 			finally
 			{
-				setCreated?.Clear();
+				setCreated?.Dispose();
 			}
 		}
-
-		/// <summary>
-		/// Select a random number but skip the excluded one.
-		/// </summary>
-		/// <param name="range">The range of values to select from.</param>
-		/// <param name="excluding">The value to skip.</param>
-		/// <returns>The value selected.</returns>
-		public static int NextRandomIntegerExcluding(
-			int range,
-			int excluding, params int[] others)
-			=> R.Value.NextExcluding(range, excluding, others);
 
 		/// <summary>
 		/// Select a random number but skip the excluded one.
@@ -915,17 +873,6 @@ namespace Open.RandomizationExtensions
 		/// <param name="range">The range of values to select from.</param>
 		/// <param name="excluding">The value to skip.</param>
 		/// <returns>The value selected.</returns>
-		public static int NextRandomIntegerExcluding(
-			int range,
-			uint excluding, params uint[] others)
-			=> R.Value.NextExcluding(range, excluding, others);
-
-		/// <summary>
-		/// Select a random number but skip the excluded one.
-		/// </summary>
-		/// <param name="range">The range of values to select from.</param>
-		/// <param name="excluding">The value to skip.</param>
-		/// <returns>The value selected.</returns>
 		public static int NextExcluding(this Random source,
 			int range,
 			uint excluding, params uint[] others)
@@ -937,7 +884,6 @@ namespace Open.RandomizationExtensions
 			return NextExcluding(source, range,
 				Combined(exInt, others.Where(v => v <= int.MaxValue).Cast<int>()));
 		}
-
 	}
 
 }
