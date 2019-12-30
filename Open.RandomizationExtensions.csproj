@@ -20,7 +20,7 @@ Part of the "Open" set of libraries.</Description>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Open.MemoryExtensions" Version="2.4.0" />
+    <PackageReference Include="Open.MemoryExtensions" Version="2.4.1" />
   </ItemGroup>
 
 </Project>
