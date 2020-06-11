@@ -14,13 +14,13 @@ Part of the "Open" set of libraries.</Description>
     <RepositoryUrl>https://github.com/electricessence/Open.RandomizationExtensions</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageTags>random select</PackageTags>
-    <Version>2.4.2</Version>
+    <Version>2.4.3</Version>
 		<LangVersion>latest</LangVersion>
 		<Nullable>enable</Nullable>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Open.MemoryExtensions" Version="2.5.1" />
+    <PackageReference Include="Open.MemoryExtensions" Version="2.5.2" />
   </ItemGroup>
 
 </Project>
