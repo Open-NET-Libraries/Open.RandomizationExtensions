@@ -1,26 +1,46 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <TargetFrameworks>netstandard2.0;netstandard2.1</TargetFrameworks>
-    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
-    <Description>
-A useful set of extensions for randomly selecting from sets.
-
-Part of the "Open" set of libraries.</Description>
-    <Copyright>https://github.com/electricessence/Open.Open.RandomizationExtensions/blob/master/LICENSE</Copyright>
-    <PackageProjectUrl>https://github.com/electricessence/Open.RandomizationExtensions</PackageProjectUrl>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/electricessence/Open.RandomizationExtensions</RepositoryUrl>
-    <RepositoryType>Git</RepositoryType>
-    <PackageTags>random select</PackageTags>
-    <Version>2.4.3</Version>
+	<PropertyGroup>
+		<TargetFrameworks>netstandard2.0; netstandard2.1</TargetFrameworks>
 		<LangVersion>latest</LangVersion>
 		<Nullable>enable</Nullable>
-  </PropertyGroup>
+		<Authors>electricessence</Authors>
+		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+		<Description>
+			A useful set of extensions for randomly selecting from sets.
 
-  <ItemGroup>
-    <PackageReference Include="Open.MemoryExtensions" Version="2.5.2" />
-  </ItemGroup>
+			Part of the "Open" set of libraries.
+		</Description>
+		<PackageTags>random;select</PackageTags>
+		<Copyright>© electricessence (Oren F.) All rights reserved.</Copyright>
+		<PackageProjectUrl>https://github.com/electricessence/Open.RandomizationExtensions</PackageProjectUrl>
+		<RepositoryUrl>https://github.com/electricessence/Open.RandomizationExtensions</RepositoryUrl>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<RepositoryType>git</RepositoryType>
+		<Version>2.5.0</Version>
+		<PackageReleaseNotes></PackageReleaseNotes>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+		<PublishRepositoryUrl>true</PublishRepositoryUrl>
+		<IncludeSymbols>true</IncludeSymbols>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
+		<PackageIcon>logo.png</PackageIcon>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <None Remove=".gitattributes" />
+	  <None Remove=".gitignore" />		
+		<None Include="logo.png">
+			<Pack>True</Pack>
+			<PackagePath></PackagePath>
+		</None>
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Open.MemoryExtensions" Version="2.8.0" />
+	</ItemGroup>
 
 </Project>
