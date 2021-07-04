@@ -3,7 +3,6 @@
  * Licensing: MIT https://github.com/electricessence/Genetic-Algorithm-Platform/blob/master/LICENSE.md
  */
 
-using Open.Memory;
 using System;
 using System.Buffers;
 using System.Collections.Generic;
@@ -165,16 +164,23 @@ namespace Open.RandomizationExtensions
 					return RandomSelectIndexExcept(in source, random, exclusionSet.Single());
 
 				var count = source.Length;
-				using var temp = ArrayPool<int>.Shared.RentDisposable(count);
-				var indexes = temp.Array;
-				var indexCount = 0;
-				for (var i = 0; i < count; ++i)
+				var pool = ArrayPool<int>.Shared;
+				var indexes = pool.Rent(count);
+				try
 				{
-					if (!exclusionSet.Contains(source[i]))
-						indexes[indexCount++] = i;
+					var indexCount = 0;
+					for (var i = 0; i < count; ++i)
+					{
+						if (!exclusionSet.Contains(source[i]))
+							indexes[indexCount++] = i;
+					}
+					return indexCount == 0 ? -1
+						: indexes[(random ?? R.Value).Next(indexCount)];
 				}
-				return indexCount == 0 ? -1
-					: indexes[(random ?? R.Value).Next(indexCount)];
+				finally
+				{
+					pool.Return(indexes);
+				}
 			}
 			finally
 			{
@@ -211,18 +217,26 @@ namespace Open.RandomizationExtensions
 			if (others.Length != 0)
 				return RandomSelectIndex(in source, random, Combined(excluding, others));
 
-			using var temp = ArrayPool<int>.Shared.RentDisposable(others.Length);
-			var indexes = temp.Array;
-			var i = -1;
-			var indexCount = 0;
-			foreach (var value in source)
+			var pool = ArrayPool<int>.Shared;
+			var indexes = pool.Rent(others.Length);
+			try
 			{
-				++i;
-				bool equals = excluding is null ? value is null : excluding.Equals(value);
-				if (!equals)
-					indexes[indexCount++] = i;
+				var i = -1;
+				var indexCount = 0;
+				foreach (var value in source)
+				{
+					++i;
+					bool equals = excluding is null ? value is null : excluding.Equals(value);
+					if (!equals)
+						indexes[indexCount++] = i;
+				}
+				return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
 			}
-			return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
+			finally
+			{
+				pool.Return(indexes);
+			}
+
 		}
 
 		/// <summary>
@@ -302,17 +316,25 @@ namespace Open.RandomizationExtensions
 				if (exclusionSet.Count == 1)
 					return RandomSelectIndexExcept(random, count, source, exclusionSet.Single());
 
-				using var indexesTemp = ArrayPool<int>.Shared.RentDisposable(count);
-				var indexes = indexesTemp.Array;
-				var i = -1;
-				var indexCount = 0;
-				foreach (var value in source)
+				var pool = ArrayPool<int>.Shared;
+				var indexes = pool.Rent(count);
+				try
 				{
-					++i;
-					if (!exclusionSet.Contains(value))
-						indexes[indexCount++] = i;
+
+					var i = -1;
+					var indexCount = 0;
+					foreach (var value in source)
+					{
+						++i;
+						if (!exclusionSet.Contains(value))
+							indexes[indexCount++] = i;
+					}
+					return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
 				}
-				return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
+				finally
+				{
+					pool.Return(indexes);
+				}
 			}
 			finally
 			{
@@ -328,18 +350,26 @@ namespace Open.RandomizationExtensions
 			if (others.Length != 0)
 				RandomSelectIndex(random, count, source, Combined(excluding, others));
 
-			using var indexesTemp = ArrayPool<int>.Shared.RentDisposable(count);
-			var indexes = indexesTemp.Array;
-			var i = -1;
-			var indexCount = 0;
-			foreach (var value in source)
+			var pool = ArrayPool<int>.Shared;
+			var indexes = pool.Rent(count);
+			try
 			{
-				++i;
-				bool equals = excluding is null ? value is null : excluding.Equals(value);
-				if (!equals)
-					indexes[indexCount++] = i;
+				var i = -1;
+				var indexCount = 0;
+				foreach (var value in source)
+				{
+					++i;
+					bool equals = excluding is null ? value is null : excluding.Equals(value);
+					if (!equals)
+						indexes[indexCount++] = i;
+				}
+				return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
 			}
-			return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
+			finally
+			{
+				pool.Return(indexes);
+			}
+
 		}
 
 		/// <summary>
@@ -629,7 +659,7 @@ namespace Open.RandomizationExtensions
 				return false;
 			}
 
-			value = GetElementAt(source,index);
+			value = GetElementAt(source, index);
 
 			return true;
 		}
@@ -778,19 +808,25 @@ namespace Open.RandomizationExtensions
 				if (exclusionSet == null || exclusionSet.Count == 0)
 					return (ushort)source.Next(range);
 
-				using var indexesTemp = ArrayPool<ushort>.Shared.RentDisposable(range);
-				var indexes = indexesTemp.Array;
-
-				var indexCount = 0;
-				for (ushort i = 0; i < range; ++i)
+				var pool = ArrayPool<ushort>.Shared;
+				var indexes = pool.Rent(range);
+				try
 				{
-					if (!exclusionSet.Contains(i))
-						indexes[indexCount++] = i;
-				}
-				if (indexCount == 0)
-					throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
+					var indexCount = 0;
+					for (ushort i = 0; i < range; ++i)
+					{
+						if (!exclusionSet.Contains(i))
+							indexes[indexCount++] = i;
+					}
+					if (indexCount == 0)
+						throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
 
-				return indexes[source.Next(indexCount)];
+					return indexes[source.Next(indexCount)];
+				}
+				finally
+				{
+					pool.Return(indexes);
+				}
 			}
 			finally
 			{
@@ -820,17 +856,25 @@ namespace Open.RandomizationExtensions
 				if (exclusionSet == null || exclusionSet.Count == 0)
 					return source.Next(range);
 
-				using var indexesTemp = ArrayPool<int>.Shared.RentDisposable(range);
-				var indexes = indexesTemp.Array;
-				var indexCount = 0;
-				for (var i = 0; i < range; ++i)
+				var pool = ArrayPool<int>.Shared;
+				var indexes = pool.Rent(range);
+				try
 				{
-					if (!exclusionSet.Contains(i))
-						indexes[indexCount++] = i;
+					var indexCount = 0;
+					for (var i = 0; i < range; ++i)
+					{
+						if (!exclusionSet.Contains(i))
+							indexes[indexCount++] = i;
+					}
+					if (indexCount == 0)
+						throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
+					return indexes[source.Next(indexCount)];
 				}
-				if (indexCount == 0)
-					throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
-				return indexes[source.Next(indexCount)];
+				finally
+				{
+					pool.Return(indexes);
+				}
+
 			}
 			finally
 			{

@@ -22,7 +22,7 @@ namespace Open.RandomizationExtensions
 			if (base.Contains(item))
 				return true;
 
-			while(Source.MoveNext())
+			while (Source.MoveNext())
 			{
 				var i = Source.Current;
 				Add(i);
