@@ -12,14 +12,35 @@ using System.Linq;
 
 namespace Open.RandomizationExtensions;
 
-public static class Randomizer
+public static partial class Randomizer
 {
-	static readonly Lazy<Random> R = new(() => new Random());
+#if NET6_0_OR_GREATER
+	/// <summary>
+	/// The <see cref="System.Random"/> used by the extensions when none is supplied:
+	/// the runtime's thread-safe <see cref="System.Random.Shared"/>.
+	/// </summary>
+	public static Random Random => System.Random.Shared;
+
+	static Random Default => System.Random.Shared;
+#else
+	// System.Random instance methods are not thread-safe: concurrent use corrupts the
+	// generator's internal state (degrading to constant output on some frameworks).
+	// A single shared Lazy<Random> instance was therefore a hazard for any parallel
+	// consumer. Downlevel targets get one instance per thread; the seed mixes in the
+	// thread id because the classic parameterless ctor seeds from the tick count, and
+	// two threads starting in the same tick would otherwise produce identical sequences.
+	static readonly System.Threading.ThreadLocal<Random> R = new(
+		() => new Random(unchecked((Environment.TickCount * 31)
+			+ System.Threading.Thread.CurrentThread.ManagedThreadId)));
 
 	/// <summary>
-	/// The Random object used by the extensions.
+	/// The Random object used by the extensions. One instance per thread.
 	/// </summary>
-	public static Random Random => R.Value;
+	public static Random Random => Default;
+
+	// The ThreadLocal was constructed with a value factory that never returns null.
+	static Random Default => R.Value ?? throw new InvalidOperationException("ThreadLocal value factory returned null.");
+#endif
 
 	/// <summary>
 	/// Attempts to select a LinkedListNode at random and remove it.
@@ -37,7 +58,7 @@ public static class Randomizer
 			return false;
 		}
 
-		var r = (random ?? R.Value).Next(source.Count);
+		var r = (random ?? Default).Next(source.Count);
 		// Walk to index r; r < Count guarantees the walk lands before the tail, and the
 		// loop condition itself proves the node non-null.
 		// (Previously the walk advanced r+1 times, which could never select the first
@@ -85,7 +106,7 @@ public static class Randomizer
 			return false;
 		}
 
-		var r = (random ?? R.Value).Next(source.Count);
+		var r = (random ?? Default).Next(source.Count);
 		value = source[r];
 		source.RemoveAt(r);
 		return true;
@@ -115,7 +136,7 @@ public static class Randomizer
 		if (source.Length == 0)
 			throw new InvalidOperationException("Source collection is empty.");
 
-		return ref source[(random ?? R.Value).Next(source.Length)];
+		return ref source[(random ?? Default).Next(source.Length)];
 	}
 
 	/// <summary>
@@ -131,7 +152,7 @@ public static class Randomizer
 		if (source.Length == 0)
 			throw new InvalidOperationException("Source collection is empty.");
 
-		return ref source[(random ?? R.Value).Next(source.Length)];
+		return ref source[(random ?? Default).Next(source.Length)];
 	}
 
 	/// <summary>
@@ -149,7 +170,7 @@ public static class Randomizer
 			return -1;
 
 		if (exclusion is null || exclusion is ICollection<T> c && c.Count == 0)
-			return (random ?? R.Value).Next(source.Length);
+			return (random ?? Default).Next(source.Length);
 
 		// A DeferredHashSet fills itself lazily during Contains, so its Count is
 		// meaningless until it has been pumped: the Count==0/Count==1 fast paths below
@@ -162,7 +183,7 @@ public static class Randomizer
 			if (materialized is not null)
 			{
 				if (materialized.Count == 0)
-					return (random ?? R.Value).Next(source.Length);
+					return (random ?? Default).Next(source.Length);
 
 				if (materialized.Count == 1)
 					return RandomSelectIndexExcept(in source, random, materialized.Single());
@@ -199,7 +220,7 @@ public static class Randomizer
 				}
 
 				return indexCount == 0 ? -1
-					: indexes[(random ?? R.Value).Next(indexCount)];
+					: indexes[(random ?? Default).Next(indexCount)];
 			}
 			finally
 			{
@@ -258,7 +279,7 @@ public static class Randomizer
 					indexes[indexCount++] = i;
 			}
 
-			return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
+			return indexCount == 0 ? -1 : indexes[(random ?? Default).Next(indexCount)];
 		}
 		finally
 		{
@@ -332,7 +353,7 @@ public static class Randomizer
 			return -1;
 
 		if (exclusion is null || exclusion is ICollection<T> c && c.Count == 0)
-			return (random ?? R.Value).Next(count);
+			return (random ?? Default).Next(count);
 
 		// See the span overload: Count fast paths are only valid for a materialized set;
 		// a DeferredHashSet must be consulted through its concrete type.
@@ -343,7 +364,7 @@ public static class Randomizer
 			if (materialized is not null)
 			{
 				if (materialized.Count == 0)
-					return (random ?? R.Value).Next(count);
+					return (random ?? Default).Next(count);
 
 				if (materialized.Count == 1)
 					return RandomSelectIndexExcept(random, count, source, materialized.Single());
@@ -378,7 +399,7 @@ public static class Randomizer
 						indexes[indexCount++] = i;
 				}
 
-				return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
+				return indexCount == 0 ? -1 : indexes[(random ?? Default).Next(indexCount)];
 			}
 			finally
 			{
@@ -413,7 +434,7 @@ public static class Randomizer
 					indexes[indexCount++] = i;
 			}
 
-			return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
+			return indexCount == 0 ? -1 : indexes[(random ?? Default).Next(indexCount)];
 		}
 		finally
 		{

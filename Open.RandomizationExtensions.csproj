@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>netstandard2.0; netstandard2.1</TargetFrameworks>
+		<TargetFrameworks>netstandard2.0; netstandard2.1; net10.0</TargetFrameworks>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<LangVersion>latest</LangVersion>
 		<Nullable>enable</Nullable>
@@ -18,8 +18,8 @@
 		<RepositoryUrl>https://github.com/Open-NET-Libraries/Open.RandomizationExtensions</RepositoryUrl>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryType>git</RepositoryType>
-		<Version>2.5.4</Version>
-		<PackageReleaseNotes>Fixes: multi-value exclusions were silently ignored (deferred exclusion sets reported Count 0 before being pumped); span-based single-exclusion selection threw IndexOutOfRangeException (zero-length pooled rent); LinkedList TryRandomPluck could never select the first element and threw on the last; two selection paths ignored a supplied Random; NextExcluding uint overload threw InvalidCastException.</PackageReleaseNotes>
+		<Version>2.6.0</Version>
+		<PackageReleaseNotes>Adds a net10.0 target with allocation-free params-span exclusion overloads. Default RNG is now thread-safe: Random.Shared on modern targets, one instance per thread downlevel. Includes all 2.5.4 fixes.</PackageReleaseNotes>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<IncludeSymbols>true</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -27,7 +27,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.*" PrivateAssets="All" />
 	</ItemGroup>
 
 	<ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">
