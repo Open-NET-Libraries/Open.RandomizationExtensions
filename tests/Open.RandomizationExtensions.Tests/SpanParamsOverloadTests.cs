@@ -17,7 +17,7 @@ public class SpanParamsOverloadTests
 	[Fact]
 	public void Collection_SpanParams_TryRandomSelectOneExcept_HonorsAllExclusions()
 	{
-		IReadOnlyCollection<char> source = new[] { 'a', 'b', 'c' };
+		IReadOnlyCollection<char> source = ['a', 'b', 'c'];
 		for (var i = 0; i < Iterations; i++)
 		{
 			Assert.True(source.TryRandomSelectOneExcept(out var value, 'a', 'b'));
@@ -28,7 +28,7 @@ public class SpanParamsOverloadTests
 	[Fact]
 	public void Collection_SpanParams_AllExcluded_ReturnsFalse()
 	{
-		IReadOnlyCollection<char> source = new[] { 'a', 'b' };
+		IReadOnlyCollection<char> source = ['a', 'b'];
 		Assert.False(source.TryRandomSelectOneExcept(out _, 'a', 'b'));
 	}
 
@@ -61,7 +61,7 @@ public class SpanParamsOverloadTests
 	[Fact]
 	public void Collection_SpanParams_RandomSelectOneExcept_AllExcluded_Throws()
 	{
-		IReadOnlyCollection<char> source = new[] { 'a', 'b' };
+		IReadOnlyCollection<char> source = ['a', 'b'];
 		Assert.Throws<InvalidOperationException>(() => source.RandomSelectOneExcept('a', 'b'));
 	}
 
@@ -108,7 +108,7 @@ public class SpanParamsOverloadTests
 	[Fact]
 	public void Collection_ArrayParams_TryRandomSelectOneExcept_HonorsAllExclusions()
 	{
-		IReadOnlyCollection<char> source = new[] { 'a', 'b', 'c' };
+		IReadOnlyCollection<char> source = ['a', 'b', 'c'];
 		var others = new[] { 'b' };
 		for (var i = 0; i < Iterations; i++)
 		{

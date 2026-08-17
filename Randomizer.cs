@@ -304,7 +304,7 @@ public static partial class Randomizer
 	/// </summary>
 	/// <typeparam name="T">The generic type of the source.</typeparam>
 	/// <param name="source">The source span.</param>
-	/// <param name="exclusion">A value to exclude from selection.</param>
+	/// <param name="excluding">A value to exclude from selection.</param>
 	/// <param name="others">The additional set of optional values to exclude from selection.</param>
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndexExcept<T>(this in ReadOnlySpan<T> source, T excluding, params T[] others)
@@ -893,7 +893,7 @@ public static partial class Randomizer
 		DeferredHashSet<ushort>? deferred = materialized is null ? new DeferredHashSet<ushort>(exclusion) : null;
 		try
 		{
-			if (materialized is not null && materialized.Count == 0)
+			if (materialized?.Count == 0)
 				return (ushort)source.Next(range);
 
 			var pool = ArrayPool<ushort>.Shared;
@@ -962,7 +962,7 @@ public static partial class Randomizer
 		DeferredHashSet<int>? deferred = materialized is null ? new DeferredHashSet<int>(exclusion) : null;
 		try
 		{
-			if (materialized is not null && materialized.Count == 0)
+			if (materialized?.Count == 0)
 				return source.Next(range);
 
 			var pool = ArrayPool<int>.Shared;

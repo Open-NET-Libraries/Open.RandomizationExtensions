@@ -1,5 +1,3 @@
-using Open.RandomizationExtensions;
-
 namespace Open.RandomizationExtensions.Tests;
 
 /// <summary>
@@ -19,7 +17,7 @@ public class ExclusionSelectionTests
 	[Fact]
 	public void Collection_TryRandomSelectOneExcept_HonorsAllExclusions()
 	{
-		IReadOnlyCollection<char> source = new[] { 'a', 'b', 'c' };
+		IReadOnlyCollection<char> source = ['a', 'b', 'c'];
 		for (var i = 0; i < Iterations; i++)
 		{
 			Assert.True(source.TryRandomSelectOneExcept(out var value, 'a', 'b'));
@@ -30,14 +28,14 @@ public class ExclusionSelectionTests
 	[Fact]
 	public void Collection_TryRandomSelectOneExcept_AllExcluded_ReturnsFalse()
 	{
-		IReadOnlyCollection<char> source = new[] { 'a', 'b' };
+		IReadOnlyCollection<char> source = ['a', 'b'];
 		Assert.False(source.TryRandomSelectOneExcept(out _, 'a', 'b'));
 	}
 
 	[Fact]
 	public void Collection_RandomSelectOneExcept_AllExcluded_Throws()
 	{
-		IReadOnlyCollection<char> source = new[] { 'a', 'b' };
+		IReadOnlyCollection<char> source = ['a', 'b'];
 		Assert.Throws<InvalidOperationException>(() => source.RandomSelectOneExcept('a', 'b'));
 	}
 
@@ -90,7 +88,7 @@ public class ExclusionSelectionTests
 	[Fact]
 	public void Collection_TryRandomSelectOne_WithEnumerableExclusion_HonorsIt()
 	{
-		IReadOnlyCollection<int> source = new[] { 1, 2, 3, 4 };
+		IReadOnlyCollection<int> source = [1, 2, 3, 4];
 		// Deliberately NOT an ISet<T>: forces the DeferredHashSet path.
 		IEnumerable<int> exclusion = new[] { 1, 2, 3 }.Where(_ => true);
 		for (var i = 0; i < Iterations; i++)
@@ -116,7 +114,7 @@ public class ExclusionSelectionTests
 	public void Collection_TryRandomSelectOne_WithSetExclusion_StillWorks()
 	{
 		// The previously-working path: exclusion already an ISet<T>.
-		IReadOnlyCollection<int> source = new[] { 1, 2, 3 };
+		IReadOnlyCollection<int> source = [1, 2, 3];
 		var exclusion = new HashSet<int> { 1, 3 };
 		for (var i = 0; i < Iterations; i++)
 		{
@@ -128,7 +126,7 @@ public class ExclusionSelectionTests
 	[Fact]
 	public void Collection_TryRandomSelectOne_ExclusionCoversSource_ReturnsFalse()
 	{
-		IReadOnlyCollection<int> source = new[] { 1, 2 };
+		IReadOnlyCollection<int> source = [1, 2];
 		IEnumerable<int> exclusion = new[] { 1, 2, 99 }.Where(_ => true);
 		Assert.False(source.TryRandomSelectOne(out _, exclusion));
 	}
@@ -138,12 +136,12 @@ public class ExclusionSelectionTests
 	[Fact]
 	public void SuppliedRandom_ProducesDeterministicSequence()
 	{
-		IReadOnlyCollection<int> source = new[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+		IReadOnlyCollection<int> source = [1, 2, 3, 4, 5, 6, 7, 8];
 
 		static int[] Draw(int seed)
 		{
 			var random = new Random(seed);
-			IReadOnlyCollection<int> src = new[] { 1, 2, 3, 4, 5, 6, 7, 8 };
+			IReadOnlyCollection<int> src = [1, 2, 3, 4, 5, 6, 7, 8];
 			var picks = new int[64];
 			for (var i = 0; i < picks.Length; i++)
 			{

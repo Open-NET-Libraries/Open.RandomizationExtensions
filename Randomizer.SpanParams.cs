@@ -149,14 +149,12 @@ public static partial class Randomizer
 	/// <inheritdoc cref="RandomSelectOneExcept{T}(IReadOnlyCollection{T}, Random?, T, T[])"/>
 	public static T RandomSelectOneExcept<T>(
 		this IReadOnlyCollection<T> source, Random? random, T excluding, params ReadOnlySpan<T> others)
-	{
-		return source is null ? throw new ArgumentNullException(nameof(source))
+		=> source is null ? throw new ArgumentNullException(nameof(source))
 			: source.Count == 0
 			? throw new InvalidOperationException("Source collection is empty.")
 			: TryRandomSelectOneExcept(source, out var value, random, excluding, others)
 			? value
 			: throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
-	}
 
 	/// <inheritdoc cref="RandomSelectOneExcept{T}(IReadOnlyCollection{T}, T, T[])"/>
 	public static T RandomSelectOneExcept<T>(

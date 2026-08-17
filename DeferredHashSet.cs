@@ -16,15 +16,12 @@ namespace Open.RandomizationExtensions;
 /// reflects only what has been pumped so far. Callers must not use Count-based
 /// fast paths against an instance of this type.
 /// </remarks>
-sealed class DeferredHashSet<T> : HashSet<T>, IDisposable
+sealed class DeferredHashSet<T>(IEnumerator<T> source) : HashSet<T>, IDisposable
 {
-	public DeferredHashSet(IEnumerator<T> source)
-		=> Source = source ?? throw new ArgumentNullException(nameof(source));
-
 	public DeferredHashSet(IEnumerable<T> source)
 		: this((source ?? throw new ArgumentNullException(nameof(source))).GetEnumerator()) { }
 
-	private readonly IEnumerator<T> Source;
+	private readonly IEnumerator<T> Source = source ?? throw new ArgumentNullException(nameof(source));
 
 	public new bool Contains(T item)
 	{

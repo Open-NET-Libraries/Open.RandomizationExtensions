@@ -32,7 +32,7 @@ public class NullGuardTests
 	[Fact]
 	public void TryRandomSelectOneExcept_NullOthersArray_ThrowsArgumentNull()
 	{
-		IReadOnlyCollection<char> source = new[] { 'a', 'b' };
+		IReadOnlyCollection<char> source = ['a', 'b'];
 		Assert.Throws<ArgumentNullException>("others",
 			() => source.TryRandomSelectOneExcept(out _, 'a', (char[])null!));
 	}
