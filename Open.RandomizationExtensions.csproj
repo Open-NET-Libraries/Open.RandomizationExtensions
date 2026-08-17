@@ -1,10 +1,18 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFrameworks>netstandard2.0; netstandard2.1</TargetFrameworks>
+		<TargetFrameworks>netstandard2.0; netstandard2.1; net8.0; net10.0</TargetFrameworks>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<LangVersion>latest</LangVersion>
 		<Nullable>enable</Nullable>
+		<EnableNETAnalyzers>true</EnableNETAnalyzers>
+		<AnalysisLevel>latest-all</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<!-- CA5394: this library is explicitly a non-cryptographic randomization utility;
+		     System.Random is the point. Cryptographic selection is out of scope.
+		     CA1510: ArgumentNullException.ThrowIfNull does not exist on netstandard2.0;
+		     guards must compile identically on every target. -->
+		<NoWarn>$(NoWarn);CA5394;CA1510</NoWarn>
 		<Authors>electricessence</Authors>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 		<Description>
@@ -18,8 +26,8 @@
 		<RepositoryUrl>https://github.com/Open-NET-Libraries/Open.RandomizationExtensions</RepositoryUrl>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryType>git</RepositoryType>
-		<Version>2.5.4</Version>
-		<PackageReleaseNotes>Fixes: multi-value exclusions were silently ignored (deferred exclusion sets reported Count 0 before being pumped); span-based single-exclusion selection threw IndexOutOfRangeException (zero-length pooled rent); LinkedList TryRandomPluck could never select the first element and threw on the last; two selection paths ignored a supplied Random; NextExcluding uint overload threw InvalidCastException.</PackageReleaseNotes>
+		<Version>2.6.0</Version>
+		<PackageReleaseNotes>Adds net8.0 and net10.0 targets; net10.0 gains allocation-free params-span exclusion overloads. Default RNG is now thread-safe: Random.Shared on net8.0/net10.0 assets, one instance per thread on netstandard assets. Note: 2.5.4 annotated Try-pattern out parameters with MaybeNullWhen(false); consumers compiling with strict nullable warnings may see new (correct) warnings where a Try result was dereferenced without checking the returned bool. Includes all 2.5.4 fixes.</PackageReleaseNotes>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<IncludeSymbols>true</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
@@ -27,7 +35,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.0.0" PrivateAssets="All" />
+		<PackageReference Include="Microsoft.SourceLink.GitHub" Version="8.*" PrivateAssets="All" />
 	</ItemGroup>
 
 	<ItemGroup Condition=" '$(TargetFramework)' == 'netstandard2.0' ">

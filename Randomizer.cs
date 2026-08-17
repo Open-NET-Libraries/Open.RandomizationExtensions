@@ -12,14 +12,40 @@ using System.Linq;
 
 namespace Open.RandomizationExtensions;
 
-public static class Randomizer
+public static partial class Randomizer
 {
-	static readonly Lazy<Random> R = new(() => new Random());
+#if NET6_0_OR_GREATER
+	/// <summary>
+	/// The <see cref="System.Random"/> used by the extensions when none is supplied:
+	/// the runtime's thread-safe <see cref="System.Random.Shared"/>.
+	/// </summary>
+	public static Random Random => System.Random.Shared;
+
+	static Random Default => System.Random.Shared;
+#else
+	// System.Random instance methods are not thread-safe: concurrent use corrupts the
+	// generator's internal state (degrading to constant output on some frameworks).
+	// A single shared Lazy<Random> instance was therefore a hazard for any parallel
+	// consumer. Downlevel targets get one instance per thread. The seed combines a
+	// FIXED tick base captured once at type initialization (varies run to run) with a
+	// monotonic counter (unique per thread within the process), so no two threads can
+	// ever share a seed. Reading the tick per thread instead would reintroduce a narrow
+	// collision class: a tick step between two creations can offset the counter delta.
+	static readonly int _seedBase = Environment.TickCount;
+	static int _seedCounter;
+
+	static readonly System.Threading.ThreadLocal<Random> R = new(
+		() => new Random(unchecked(_seedBase
+			+ System.Threading.Interlocked.Increment(ref _seedCounter))));
 
 	/// <summary>
-	/// The Random object used by the extensions.
+	/// The Random object used by the extensions. One instance per thread.
 	/// </summary>
-	public static Random Random => R.Value;
+	public static Random Random => Default;
+
+	// The ThreadLocal was constructed with a value factory that never returns null.
+	static Random Default => R.Value ?? throw new InvalidOperationException("ThreadLocal value factory returned null.");
+#endif
 
 	/// <summary>
 	/// Attempts to select a LinkedListNode at random and remove it.
@@ -31,13 +57,15 @@ public static class Randomizer
 	/// <returns>True if successfully retrieved and item and removed the node.</returns>
 	public static bool TryRandomPluck<T>(this LinkedList<T> source, [MaybeNullWhen(false)] out T value, Random? random = null)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (source.Count == 0)
 		{
 			value = default;
 			return false;
 		}
 
-		var r = (random ?? R.Value).Next(source.Count);
+		var r = (random ?? Default).Next(source.Count);
 		// Walk to index r; r < Count guarantees the walk lands before the tail, and the
 		// loop condition itself proves the node non-null.
 		// (Previously the walk advanced r+1 times, which could never select the first
@@ -79,13 +107,15 @@ public static class Randomizer
 	/// <returns>True if successfully removed.</returns>
 	public static bool TryRandomPluck<T>(this List<T> source, [MaybeNullWhen(false)] out T value, Random? random = null)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (source.Count == 0)
 		{
 			value = default;
 			return false;
 		}
 
-		var r = (random ?? R.Value).Next(source.Count);
+		var r = (random ?? Default).Next(source.Count);
 		value = source[r];
 		source.RemoveAt(r);
 		return true;
@@ -115,7 +145,7 @@ public static class Randomizer
 		if (source.Length == 0)
 			throw new InvalidOperationException("Source collection is empty.");
 
-		return ref source[(random ?? R.Value).Next(source.Length)];
+		return ref source[(random ?? Default).Next(source.Length)];
 	}
 
 	/// <summary>
@@ -131,7 +161,7 @@ public static class Randomizer
 		if (source.Length == 0)
 			throw new InvalidOperationException("Source collection is empty.");
 
-		return ref source[(random ?? R.Value).Next(source.Length)];
+		return ref source[(random ?? Default).Next(source.Length)];
 	}
 
 	/// <summary>
@@ -149,7 +179,7 @@ public static class Randomizer
 			return -1;
 
 		if (exclusion is null || exclusion is ICollection<T> c && c.Count == 0)
-			return (random ?? R.Value).Next(source.Length);
+			return (random ?? Default).Next(source.Length);
 
 		// A DeferredHashSet fills itself lazily during Contains, so its Count is
 		// meaningless until it has been pumped: the Count==0/Count==1 fast paths below
@@ -162,7 +192,7 @@ public static class Randomizer
 			if (materialized is not null)
 			{
 				if (materialized.Count == 0)
-					return (random ?? R.Value).Next(source.Length);
+					return (random ?? Default).Next(source.Length);
 
 				if (materialized.Count == 1)
 					return RandomSelectIndexExcept(in source, random, materialized.Single());
@@ -199,7 +229,7 @@ public static class Randomizer
 				}
 
 				return indexCount == 0 ? -1
-					: indexes[(random ?? R.Value).Next(indexCount)];
+					: indexes[(random ?? Default).Next(indexCount)];
 			}
 			finally
 			{
@@ -235,6 +265,8 @@ public static class Randomizer
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndexExcept<T>(this in ReadOnlySpan<T> source, Random? random, T excluding, params T[] others)
 	{
+		if (others is null) throw new ArgumentNullException(nameof(others));
+
 		if (source.Length == 0)
 			return -1;
 
@@ -258,7 +290,7 @@ public static class Randomizer
 					indexes[indexCount++] = i;
 			}
 
-			return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
+			return indexCount == 0 ? -1 : indexes[(random ?? Default).Next(indexCount)];
 		}
 		finally
 		{
@@ -332,7 +364,7 @@ public static class Randomizer
 			return -1;
 
 		if (exclusion is null || exclusion is ICollection<T> c && c.Count == 0)
-			return (random ?? R.Value).Next(count);
+			return (random ?? Default).Next(count);
 
 		// See the span overload: Count fast paths are only valid for a materialized set;
 		// a DeferredHashSet must be consulted through its concrete type.
@@ -343,7 +375,7 @@ public static class Randomizer
 			if (materialized is not null)
 			{
 				if (materialized.Count == 0)
-					return (random ?? R.Value).Next(count);
+					return (random ?? Default).Next(count);
 
 				if (materialized.Count == 1)
 					return RandomSelectIndexExcept(random, count, source, materialized.Single());
@@ -378,7 +410,7 @@ public static class Randomizer
 						indexes[indexCount++] = i;
 				}
 
-				return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
+				return indexCount == 0 ? -1 : indexes[(random ?? Default).Next(indexCount)];
 			}
 			finally
 			{
@@ -413,7 +445,7 @@ public static class Randomizer
 					indexes[indexCount++] = i;
 			}
 
-			return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
+			return indexCount == 0 ? -1 : indexes[(random ?? Default).Next(indexCount)];
 		}
 		finally
 		{
@@ -431,7 +463,8 @@ public static class Randomizer
 	/// <param name="exclusion">The optional values to exclude from selection.</param>
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndex<T>(this IReadOnlyCollection<T> source, Random? random = null, IEnumerable<T>? exclusion = null)
-		=> RandomSelectIndex(random, source.Count, source, exclusion);
+		=> source is null ? throw new ArgumentNullException(nameof(source))
+		: RandomSelectIndex(random, source.Count, source, exclusion);
 
 	/// <summary>
 	/// Randomly selects an index from the source.
@@ -444,7 +477,9 @@ public static class Randomizer
 	/// <param name="others">The additional set of optional values to exclude from selection.</param>
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndexExcept<T>(this IReadOnlyCollection<T> source, Random random, T exclusion, params T[] others)
-		=> RandomSelectIndexExcept(random, source.Count, source, exclusion, others);
+		=> source is null ? throw new ArgumentNullException(nameof(source))
+		: others is null ? throw new ArgumentNullException(nameof(others))
+		: RandomSelectIndexExcept(random, source.Count, source, exclusion, others);
 
 	/// <summary>
 	/// Randomly selects an index from the source.
@@ -456,7 +491,9 @@ public static class Randomizer
 	/// <param name="others">The additional set of optional values to exclude from selection.</param>
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndexExcept<T>(this IReadOnlyCollection<T> source, T exclusion, params T[] others)
-		=> RandomSelectIndexExcept(default, source.Count, source, exclusion, others);
+		=> source is null ? throw new ArgumentNullException(nameof(source))
+		: others is null ? throw new ArgumentNullException(nameof(others))
+		: RandomSelectIndexExcept(default, source.Count, source, exclusion, others);
 
 	/// <summary>
 	/// Attempts to select an index at random from the source and returns the value from it..
@@ -554,6 +591,8 @@ public static class Randomizer
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (source.Count == 0)
 			throw new InvalidOperationException("Source collection is empty.");
 
@@ -592,6 +631,8 @@ public static class Randomizer
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		var index = RandomSelectIndex(random, source.Count, source, exclusion);
 		if (index == -1)
 		{
@@ -697,6 +738,9 @@ public static class Randomizer
 		Random? random,
 		T excluding, params T[] others)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+		if (others is null) throw new ArgumentNullException(nameof(others));
+
 		var index = RandomSelectIndexExcept(random, source.Count, source, excluding, others);
 		if (index == -1)
 		{
@@ -803,7 +847,9 @@ public static class Randomizer
 		this IReadOnlyCollection<T> source,
 		Random? random,
 		T excluding, params T[] others)
-		=> source.Count == 0
+		=> source is null ? throw new ArgumentNullException(nameof(source))
+		: others is null ? throw new ArgumentNullException(nameof(others))
+		: source.Count == 0
 			? throw new InvalidOperationException("Source collection is empty.")
 			: source.TryRandomSelectOneExcept(out var value, random, excluding, others)
 			? value
@@ -833,6 +879,8 @@ public static class Randomizer
 		ushort range,
 		IEnumerable<ushort> exclusion)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (range == 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
@@ -900,6 +948,8 @@ public static class Randomizer
 		int range,
 		IEnumerable<int> exclusion)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (range <= 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
@@ -967,6 +1017,9 @@ public static class Randomizer
 		int range,
 		int excluding, params int[] others)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+		if (others is null) throw new ArgumentNullException(nameof(others));
+
 		if (range <= 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
@@ -993,6 +1046,8 @@ public static class Randomizer
 		int range,
 		uint excluding, params uint[] others)
 	{
+		if (others is null) throw new ArgumentNullException(nameof(others));
+
 		var exInt = excluding > int.MaxValue ? -1 : (int)excluding;
 		return others.Length == 0
 			? NextExcluding(source, range, exInt)

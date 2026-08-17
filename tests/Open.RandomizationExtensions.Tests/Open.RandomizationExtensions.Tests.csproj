@@ -5,6 +5,12 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<IsPackable>false</IsPackable>
+		<AnalysisLevel>latest-all</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<!-- CA1707: xunit convention names tests with underscores. CA1861: constant array
+		     arguments re-allocated per call are acceptable in tests. CA5394: non-crypto
+		     randomness is the subject under test. -->
+		<NoWarn>$(NoWarn);CA1707;CA1861;CA5394</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>
