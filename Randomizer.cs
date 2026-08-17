@@ -57,6 +57,8 @@ public static partial class Randomizer
 	/// <returns>True if successfully retrieved and item and removed the node.</returns>
 	public static bool TryRandomPluck<T>(this LinkedList<T> source, [MaybeNullWhen(false)] out T value, Random? random = null)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (source.Count == 0)
 		{
 			value = default;
@@ -105,6 +107,8 @@ public static partial class Randomizer
 	/// <returns>True if successfully removed.</returns>
 	public static bool TryRandomPluck<T>(this List<T> source, [MaybeNullWhen(false)] out T value, Random? random = null)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (source.Count == 0)
 		{
 			value = default;
@@ -261,6 +265,8 @@ public static partial class Randomizer
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndexExcept<T>(this in ReadOnlySpan<T> source, Random? random, T excluding, params T[] others)
 	{
+		if (others is null) throw new ArgumentNullException(nameof(others));
+
 		if (source.Length == 0)
 			return -1;
 
@@ -457,7 +463,8 @@ public static partial class Randomizer
 	/// <param name="exclusion">The optional values to exclude from selection.</param>
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndex<T>(this IReadOnlyCollection<T> source, Random? random = null, IEnumerable<T>? exclusion = null)
-		=> RandomSelectIndex(random, source.Count, source, exclusion);
+		=> source is null ? throw new ArgumentNullException(nameof(source))
+		: RandomSelectIndex(random, source.Count, source, exclusion);
 
 	/// <summary>
 	/// Randomly selects an index from the source.
@@ -470,7 +477,9 @@ public static partial class Randomizer
 	/// <param name="others">The additional set of optional values to exclude from selection.</param>
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndexExcept<T>(this IReadOnlyCollection<T> source, Random random, T exclusion, params T[] others)
-		=> RandomSelectIndexExcept(random, source.Count, source, exclusion, others);
+		=> source is null ? throw new ArgumentNullException(nameof(source))
+		: others is null ? throw new ArgumentNullException(nameof(others))
+		: RandomSelectIndexExcept(random, source.Count, source, exclusion, others);
 
 	/// <summary>
 	/// Randomly selects an index from the source.
@@ -482,7 +491,9 @@ public static partial class Randomizer
 	/// <param name="others">The additional set of optional values to exclude from selection.</param>
 	/// <returns>The index selected.</returns>
 	public static int RandomSelectIndexExcept<T>(this IReadOnlyCollection<T> source, T exclusion, params T[] others)
-		=> RandomSelectIndexExcept(default, source.Count, source, exclusion, others);
+		=> source is null ? throw new ArgumentNullException(nameof(source))
+		: others is null ? throw new ArgumentNullException(nameof(others))
+		: RandomSelectIndexExcept(default, source.Count, source, exclusion, others);
 
 	/// <summary>
 	/// Attempts to select an index at random from the source and returns the value from it..
@@ -580,6 +591,8 @@ public static partial class Randomizer
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (source.Count == 0)
 			throw new InvalidOperationException("Source collection is empty.");
 
@@ -618,6 +631,8 @@ public static partial class Randomizer
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		var index = RandomSelectIndex(random, source.Count, source, exclusion);
 		if (index == -1)
 		{
@@ -723,6 +738,9 @@ public static partial class Randomizer
 		Random? random,
 		T excluding, params T[] others)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+		if (others is null) throw new ArgumentNullException(nameof(others));
+
 		var index = RandomSelectIndexExcept(random, source.Count, source, excluding, others);
 		if (index == -1)
 		{
@@ -829,7 +847,9 @@ public static partial class Randomizer
 		this IReadOnlyCollection<T> source,
 		Random? random,
 		T excluding, params T[] others)
-		=> source.Count == 0
+		=> source is null ? throw new ArgumentNullException(nameof(source))
+		: others is null ? throw new ArgumentNullException(nameof(others))
+		: source.Count == 0
 			? throw new InvalidOperationException("Source collection is empty.")
 			: source.TryRandomSelectOneExcept(out var value, random, excluding, others)
 			? value
@@ -859,6 +879,8 @@ public static partial class Randomizer
 		ushort range,
 		IEnumerable<ushort> exclusion)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (range == 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
@@ -926,6 +948,8 @@ public static partial class Randomizer
 		int range,
 		IEnumerable<int> exclusion)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (range <= 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
@@ -993,6 +1017,9 @@ public static partial class Randomizer
 		int range,
 		int excluding, params int[] others)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+		if (others is null) throw new ArgumentNullException(nameof(others));
+
 		if (range <= 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
@@ -1019,6 +1046,8 @@ public static partial class Randomizer
 		int range,
 		uint excluding, params uint[] others)
 	{
+		if (others is null) throw new ArgumentNullException(nameof(others));
+
 		var exInt = excluding > int.MaxValue ? -1 : (int)excluding;
 		return others.Length == 0
 			? NextExcluding(source, range, exInt)

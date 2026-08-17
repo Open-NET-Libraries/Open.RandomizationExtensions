@@ -5,6 +5,14 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<LangVersion>latest</LangVersion>
 		<Nullable>enable</Nullable>
+		<EnableNETAnalyzers>true</EnableNETAnalyzers>
+		<AnalysisLevel>latest-all</AnalysisLevel>
+		<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+		<!-- CA5394: this library is explicitly a non-cryptographic randomization utility;
+		     System.Random is the point. Cryptographic selection is out of scope.
+		     CA1510: ArgumentNullException.ThrowIfNull does not exist on netstandard2.0;
+		     guards must compile identically on every target. -->
+		<NoWarn>$(NoWarn);CA5394;CA1510</NoWarn>
 		<Authors>electricessence</Authors>
 		<PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
 		<Description>

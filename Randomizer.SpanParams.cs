@@ -104,6 +104,8 @@ public static partial class Randomizer
 	public static bool TryRandomSelectOneExcept<T>(
 		this IReadOnlyCollection<T> source, [MaybeNullWhen(false)] out T value, Random? random, T excluding, params ReadOnlySpan<T> others)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (source.Count == 0)
 		{
 			value = default;
@@ -147,11 +149,14 @@ public static partial class Randomizer
 	/// <inheritdoc cref="RandomSelectOneExcept{T}(IReadOnlyCollection{T}, Random?, T, T[])"/>
 	public static T RandomSelectOneExcept<T>(
 		this IReadOnlyCollection<T> source, Random? random, T excluding, params ReadOnlySpan<T> others)
-		=> source.Count == 0
+	{
+		return source is null ? throw new ArgumentNullException(nameof(source))
+			: source.Count == 0
 			? throw new InvalidOperationException("Source collection is empty.")
 			: TryRandomSelectOneExcept(source, out var value, random, excluding, others)
 			? value
 			: throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
+	}
 
 	/// <inheritdoc cref="RandomSelectOneExcept{T}(IReadOnlyCollection{T}, T, T[])"/>
 	public static T RandomSelectOneExcept<T>(
@@ -162,6 +167,8 @@ public static partial class Randomizer
 	public static int NextExcluding(this Random source,
 		int range, int excluding, params ReadOnlySpan<int> others)
 	{
+		if (source is null) throw new ArgumentNullException(nameof(source));
+
 		if (range <= 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
