@@ -6,6 +6,7 @@
 #if NET10_0_OR_GREATER
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Buffers;
 using System.Collections.Generic;
 
@@ -67,12 +68,12 @@ public static partial class Randomizer
 
 	/// <inheritdoc cref="TryRandomSelectOneExcept{T}(in ReadOnlySpan{T}, out T, Random?, T, T[])"/>
 	public static bool TryRandomSelectOneExcept<T>(
-		this in ReadOnlySpan<T> source, out T value, Random? random, T excluding, params ReadOnlySpan<T> others)
+		this in ReadOnlySpan<T> source, [MaybeNullWhen(false)] out T value, Random? random, T excluding, params ReadOnlySpan<T> others)
 	{
 		var index = RandomSelectIndexExcept(in source, random, excluding, others);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -82,7 +83,7 @@ public static partial class Randomizer
 
 	/// <inheritdoc cref="TryRandomSelectOneExcept{T}(in ReadOnlySpan{T}, out T, T, T[])"/>
 	public static bool TryRandomSelectOneExcept<T>(
-		this in ReadOnlySpan<T> source, out T value, T excluding, params ReadOnlySpan<T> others)
+		this in ReadOnlySpan<T> source, [MaybeNullWhen(false)] out T value, T excluding, params ReadOnlySpan<T> others)
 		=> TryRandomSelectOneExcept(in source, out value, null, excluding, others);
 
 	/// <inheritdoc cref="RandomSelectOneExcept{T}(in ReadOnlySpan{T}, Random?, T, T[])"/>
@@ -90,7 +91,7 @@ public static partial class Randomizer
 		this in ReadOnlySpan<T> source, Random? random, T excluding, params ReadOnlySpan<T> others)
 		=> source.Length == 0
 			? throw new InvalidOperationException("Source collection is empty.")
-			: TryRandomSelectOneExcept(in source, out T value, random, excluding, others)
+			: TryRandomSelectOneExcept(in source, out var value, random, excluding, others)
 			? value
 			: throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
 
@@ -101,11 +102,11 @@ public static partial class Randomizer
 
 	/// <inheritdoc cref="TryRandomSelectOneExcept{T}(IReadOnlyCollection{T}, out T, Random?, T, T[])"/>
 	public static bool TryRandomSelectOneExcept<T>(
-		this IReadOnlyCollection<T> source, out T value, Random? random, T excluding, params ReadOnlySpan<T> others)
+		this IReadOnlyCollection<T> source, [MaybeNullWhen(false)] out T value, Random? random, T excluding, params ReadOnlySpan<T> others)
 	{
 		if (source.Count == 0)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -125,7 +126,7 @@ public static partial class Randomizer
 
 			if (indexCount == 0)
 			{
-				value = default!;
+				value = default;
 				return false;
 			}
 
@@ -140,7 +141,7 @@ public static partial class Randomizer
 
 	/// <inheritdoc cref="TryRandomSelectOneExcept{T}(IReadOnlyCollection{T}, out T, T, T[])"/>
 	public static bool TryRandomSelectOneExcept<T>(
-		this IReadOnlyCollection<T> source, out T value, T excluding, params ReadOnlySpan<T> others)
+		this IReadOnlyCollection<T> source, [MaybeNullWhen(false)] out T value, T excluding, params ReadOnlySpan<T> others)
 		=> TryRandomSelectOneExcept(source, out value, null, excluding, others);
 
 	/// <inheritdoc cref="RandomSelectOneExcept{T}(IReadOnlyCollection{T}, Random?, T, T[])"/>
@@ -148,7 +149,7 @@ public static partial class Randomizer
 		this IReadOnlyCollection<T> source, Random? random, T excluding, params ReadOnlySpan<T> others)
 		=> source.Count == 0
 			? throw new InvalidOperationException("Source collection is empty.")
-			: TryRandomSelectOneExcept(source, out T value, random, excluding, others)
+			: TryRandomSelectOneExcept(source, out var value, random, excluding, others)
 			? value
 			: throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
 
