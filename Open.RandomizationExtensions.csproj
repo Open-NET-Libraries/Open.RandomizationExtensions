@@ -20,8 +20,6 @@
 		<RepositoryType>git</RepositoryType>
 		<Version>2.5.4</Version>
 		<PackageReleaseNotes>Fixes: multi-value exclusions were silently ignored (deferred exclusion sets reported Count 0 before being pumped); span-based single-exclusion selection threw IndexOutOfRangeException (zero-length pooled rent); LinkedList TryRandomPluck could never select the first element and threw on the last; two selection paths ignored a supplied Random; NextExcluding uint overload threw InvalidCastException.</PackageReleaseNotes>
-		<PackageReleaseNotes></PackageReleaseNotes>
-		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
 		<IncludeSymbols>true</IncludeSymbols>
 		<SymbolPackageFormat>snupkg</SymbolPackageFormat>

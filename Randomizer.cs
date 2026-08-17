@@ -6,6 +6,8 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Open.RandomizationExtensions;
@@ -27,25 +29,33 @@ public static class Randomizer
 	/// <param name="value">The value retrieved.</param>
 	/// <param name="random">The optional source of random numbers.</param>
 	/// <returns>True if successfully retrieved and item and removed the node.</returns>
-	public static bool TryRandomPluck<T>(this LinkedList<T> source, out T value, Random? random = null)
+	public static bool TryRandomPluck<T>(this LinkedList<T> source, [MaybeNullWhen(false)] out T value, Random? random = null)
 	{
 		if (source.Count == 0)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
 		var r = (random ?? R.Value).Next(source.Count);
-		var node = source.First!;
-		// Advance exactly r times: node starts AT index 0, so r advances lands on index r.
-		// (Previously `i <= r` advanced r+1 times, which could never select the first
+		// Walk to index r; r < Count guarantees the walk lands before the tail, and the
+		// loop condition itself proves the node non-null.
+		// (Previously the walk advanced r+1 times, which could never select the first
 		// element and threw NullReferenceException whenever the last index was drawn --
 		// including on every draw from a single-element list.)
-		for (var i = 0; i < r; i++)
-			node = node.Next!;
-		value = node.Value;
-		source.Remove(node);
-		return true;
+		for (var node = source.First; node is not null; node = node.Next)
+		{
+			if (r-- != 0)
+				continue;
+
+			value = node.Value;
+			source.Remove(node);
+			return true;
+		}
+
+		Debug.Fail("Unreachable: r < Count.");
+		value = default;
+		return false;
 	}
 
 	/// <summary>
@@ -67,11 +77,11 @@ public static class Randomizer
 	/// <param name="value">The value removed.</param>
 	/// <param name="random">The optional source of random numbers.</param>
 	/// <returns>True if successfully removed.</returns>
-	public static bool TryRandomPluck<T>(this List<T> source, out T value, Random? random = null)
+	public static bool TryRandomPluck<T>(this List<T> source, [MaybeNullWhen(false)] out T value, Random? random = null)
 	{
 		if (source.Count == 0)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -166,12 +176,24 @@ public static class Randomizer
 				var indexCount = 0;
 				for (var i = 0; i < count; ++i)
 				{
-					// The deferred set must be called through its concrete type:
-					// its Contains hides (new) rather than overrides the base method,
-					// so an ISet<T>-typed call would bypass the lazy pump entirely.
-					bool excluded = deferred is null
-						? materialized!.Contains(source[i])
-						: deferred.Contains(source[i]);
+					bool excluded;
+					if (deferred is not null)
+					{
+						// The deferred set must be called through its concrete type:
+						// its Contains hides (new) rather than overrides the base method,
+						// so an ISet<T>-typed call would bypass the lazy pump entirely.
+						excluded = deferred.Contains(source[i]);
+					}
+					else if (materialized is not null)
+					{
+						excluded = materialized.Contains(source[i]);
+					}
+					else
+					{
+						Debug.Fail("Unreachable: deferred and materialized are constructed as complements.");
+						excluded = false;
+					}
+
 					if (!excluded)
 						indexes[indexCount++] = i;
 				}
@@ -336,9 +358,22 @@ public static class Randomizer
 				foreach (var value in source)
 				{
 					++i;
-					bool excluded = deferred is null
-						? materialized!.Contains(value)
-						: deferred.Contains(value);
+					bool excluded;
+					if (deferred is not null)
+					{
+						// Concrete-type call so the lazy pump binds (Contains hides, not overrides).
+						excluded = deferred.Contains(value);
+					}
+					else if (materialized is not null)
+					{
+						excluded = materialized.Contains(value);
+					}
+					else
+					{
+						Debug.Fail("Unreachable: deferred and materialized are constructed as complements.");
+						excluded = false;
+					}
+
 					if (!excluded)
 						indexes[indexCount++] = i;
 				}
@@ -435,14 +470,14 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this in ReadOnlySpan<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 	{
 		var index = RandomSelectIndex(in source, random, exclusion);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -461,7 +496,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this in ReadOnlySpan<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		IEnumerable<T> exclusion)
 		=> TryRandomSelectOne(in source, out value, null, exclusion);
 
@@ -477,7 +512,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this in Span<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 		=> TryRandomSelectOne((ReadOnlySpan<T>)source, out value, random, exclusion);
@@ -493,7 +528,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this in Span<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		IEnumerable<T> exclusion)
 		=> TryRandomSelectOne((ReadOnlySpan<T>)source, out value, null, exclusion);
 
@@ -553,14 +588,14 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this IReadOnlyCollection<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 	{
 		var index = RandomSelectIndex(random, source.Count, source, exclusion);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -580,7 +615,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this IReadOnlyCollection<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		IEnumerable<T> exclusion)
 		=> TryRandomSelectOne(source, out value, default, exclusion);
 
@@ -597,14 +632,14 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this in ReadOnlySpan<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random,
 		T excluding, params T[] others)
 	{
 		var index = RandomSelectIndexExcept(in source, random, excluding, others);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -624,7 +659,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this in ReadOnlySpan<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		T excluding, params T[] others)
 		=> TryRandomSelectOneExcept(in source, out value, default, excluding, others);
 
@@ -640,7 +675,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this in Span<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random,
 		T excluding, params T[] others)
 		=> TryRandomSelectOneExcept((ReadOnlySpan<T>)source, out value, random, excluding, others);
@@ -658,14 +693,14 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this IReadOnlyCollection<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random,
 		T excluding, params T[] others)
 	{
 		var index = RandomSelectIndexExcept(random, source.Count, source, excluding, others);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -686,7 +721,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this IReadOnlyCollection<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		T excluding, params T[] others)
 		=> TryRandomSelectOneExcept(source, out value, default, excluding, others);
 
@@ -706,7 +741,7 @@ public static class Randomizer
 		T excluding, params T[] others)
 		=> source.Length == 0
 			? throw new InvalidOperationException("Source collection is empty.")
-			: TryRandomSelectOneExcept(in source, out T value, random, excluding, others)
+			: TryRandomSelectOneExcept(in source, out var value, random, excluding, others)
 			? value
 			: throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
 
@@ -770,7 +805,7 @@ public static class Randomizer
 		T excluding, params T[] others)
 		=> source.Count == 0
 			? throw new InvalidOperationException("Source collection is empty.")
-			: source.TryRandomSelectOneExcept(out T value, random, excluding, others)
+			: source.TryRandomSelectOneExcept(out var value, random, excluding, others)
 			? value
 			: throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
 
@@ -820,9 +855,22 @@ public static class Randomizer
 				var indexCount = 0;
 				for (ushort i = 0; i < range; ++i)
 				{
-					bool excluded = deferred is null
-						? materialized!.Contains(i)
-						: deferred.Contains(i);
+					bool excluded;
+					if (deferred is not null)
+					{
+						// Concrete-type call so the lazy pump binds (Contains hides, not overrides).
+						excluded = deferred.Contains(i);
+					}
+					else if (materialized is not null)
+					{
+						excluded = materialized.Contains(i);
+					}
+					else
+					{
+						Debug.Fail("Unreachable: deferred and materialized are constructed as complements.");
+						excluded = false;
+					}
+
 					if (!excluded)
 						indexes[indexCount++] = i;
 				}
@@ -874,9 +922,22 @@ public static class Randomizer
 				var indexCount = 0;
 				for (var i = 0; i < range; ++i)
 				{
-					bool excluded = deferred is null
-						? materialized!.Contains(i)
-						: deferred.Contains(i);
+					bool excluded;
+					if (deferred is not null)
+					{
+						// Concrete-type call so the lazy pump binds (Contains hides, not overrides).
+						excluded = deferred.Contains(i);
+					}
+					else if (materialized is not null)
+					{
+						excluded = materialized.Contains(i);
+					}
+					else
+					{
+						Debug.Fail("Unreachable: deferred and materialized are constructed as complements.");
+						excluded = false;
+					}
+
 					if (!excluded)
 						indexes[indexCount++] = i;
 				}
