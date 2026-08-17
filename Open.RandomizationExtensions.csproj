@@ -18,7 +18,8 @@
 		<RepositoryUrl>https://github.com/Open-NET-Libraries/Open.RandomizationExtensions</RepositoryUrl>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryType>git</RepositoryType>
-		<Version>2.5.3</Version>
+		<Version>2.5.4</Version>
+		<PackageReleaseNotes>Fixes: multi-value exclusions were silently ignored (deferred exclusion sets reported Count 0 before being pumped); span-based single-exclusion selection threw IndexOutOfRangeException (zero-length pooled rent); LinkedList TryRandomPluck could never select the first element and threw on the last; two selection paths ignored a supplied Random; NextExcluding uint overload threw InvalidCastException.</PackageReleaseNotes>
 		<PackageReleaseNotes></PackageReleaseNotes>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -37,8 +38,15 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- The library project lives at the repo root, so the default SDK globs would
+		     otherwise sweep the nested test project's sources into this compilation. -->
+		<Compile Remove="tests\**" />
+		<None Remove="tests\**" />
+	</ItemGroup>
+
+	<ItemGroup>
 	  <None Remove=".gitattributes" />
-	  <None Remove=".gitignore" />		
+	  <None Remove=".gitignore" />
 		<None Include="logo.png">
 			<Pack>True</Pack>
 			<PackagePath></PackagePath>
