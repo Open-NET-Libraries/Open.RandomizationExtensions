@@ -3,7 +3,20 @@ using System.Collections.Generic;
 
 namespace Open.RandomizationExtensions;
 
-class DeferredHashSet<T> : HashSet<T>, IDisposable
+/// <summary>
+/// A <see cref="HashSet{T}"/> that fills itself lazily from an enumerator as
+/// <see cref="Contains(T)"/> is called.
+/// </summary>
+/// <remarks>
+/// IMPORTANT: <see cref="Contains(T)"/> HIDES (<see langword="new"/>) rather than
+/// overrides the base method, so it only executes when called through a
+/// <see cref="DeferredHashSet{T}"/>-typed reference. A call through
+/// <see cref="ISet{T}"/> or <see cref="HashSet{T}"/> bypasses the lazy pump and
+/// consults only what has already been materialized. Likewise <see cref="HashSet{T}.Count"/>
+/// reflects only what has been pumped so far. Callers must not use Count-based
+/// fast paths against an instance of this type.
+/// </remarks>
+sealed class DeferredHashSet<T> : HashSet<T>, IDisposable
 {
 	public DeferredHashSet(IEnumerator<T> source)
 		=> Source = source ?? throw new ArgumentNullException(nameof(source));
@@ -18,11 +31,14 @@ class DeferredHashSet<T> : HashSet<T>, IDisposable
 		if (base.Contains(item))
 			return true;
 
+		// Use the same comparer as the base set so pump-time matches agree with
+		// what base.Contains would later report.
+		var comparer = EqualityComparer<T>.Default;
 		while (Source.MoveNext())
 		{
 			var i = Source.Current;
 			_ = Add(i);
-			if (item is null ? i is null : item.Equals(i))
+			if (comparer.Equals(item, i))
 				return true;
 		}
 
