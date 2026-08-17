@@ -26,12 +26,17 @@ public static partial class Randomizer
 	// System.Random instance methods are not thread-safe: concurrent use corrupts the
 	// generator's internal state (degrading to constant output on some frameworks).
 	// A single shared Lazy<Random> instance was therefore a hazard for any parallel
-	// consumer. Downlevel targets get one instance per thread; the seed mixes in the
-	// thread id because the classic parameterless ctor seeds from the tick count, and
-	// two threads starting in the same tick would otherwise produce identical sequences.
+	// consumer. Downlevel targets get one instance per thread. The seed combines a
+	// FIXED tick base captured once at type initialization (varies run to run) with a
+	// monotonic counter (unique per thread within the process), so no two threads can
+	// ever share a seed. Reading the tick per thread instead would reintroduce a narrow
+	// collision class: a tick step between two creations can offset the counter delta.
+	static readonly int _seedBase = Environment.TickCount;
+	static int _seedCounter;
+
 	static readonly System.Threading.ThreadLocal<Random> R = new(
-		() => new Random(unchecked((Environment.TickCount * 31)
-			+ System.Threading.Thread.CurrentThread.ManagedThreadId)));
+		() => new Random(unchecked(_seedBase
+			+ System.Threading.Interlocked.Increment(ref _seedCounter))));
 
 	/// <summary>
 	/// The Random object used by the extensions. One instance per thread.
