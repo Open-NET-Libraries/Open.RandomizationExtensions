@@ -6,6 +6,8 @@
 using System;
 using System.Buffers;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
 namespace Open.RandomizationExtensions;
@@ -27,21 +29,33 @@ public static class Randomizer
 	/// <param name="value">The value retrieved.</param>
 	/// <param name="random">The optional source of random numbers.</param>
 	/// <returns>True if successfully retrieved and item and removed the node.</returns>
-	public static bool TryRandomPluck<T>(this LinkedList<T> source, out T value, Random? random = null)
+	public static bool TryRandomPluck<T>(this LinkedList<T> source, [MaybeNullWhen(false)] out T value, Random? random = null)
 	{
 		if (source.Count == 0)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
 		var r = (random ?? R.Value).Next(source.Count);
-		var node = source.First;
-		for (var i = 0; i <= r; i++)
-			node = node.Next;
-		value = node.Value;
-		source.Remove(node);
-		return true;
+		// Walk to index r; r < Count guarantees the walk lands before the tail, and the
+		// loop condition itself proves the node non-null.
+		// (Previously the walk advanced r+1 times, which could never select the first
+		// element and threw NullReferenceException whenever the last index was drawn --
+		// including on every draw from a single-element list.)
+		for (var node = source.First; node is not null; node = node.Next)
+		{
+			if (r-- != 0)
+				continue;
+
+			value = node.Value;
+			source.Remove(node);
+			return true;
+		}
+
+		Debug.Fail("Unreachable: r < Count.");
+		value = default;
+		return false;
 	}
 
 	/// <summary>
@@ -63,11 +77,11 @@ public static class Randomizer
 	/// <param name="value">The value removed.</param>
 	/// <param name="random">The optional source of random numbers.</param>
 	/// <returns>True if successfully removed.</returns>
-	public static bool TryRandomPluck<T>(this List<T> source, out T value, Random? random = null)
+	public static bool TryRandomPluck<T>(this List<T> source, [MaybeNullWhen(false)] out T value, Random? random = null)
 	{
 		if (source.Count == 0)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -134,17 +148,25 @@ public static class Randomizer
 		if (source.Length == 0)
 			return -1;
 
-		DeferredHashSet<T>? setCreated = null;
+		if (exclusion is null || exclusion is ICollection<T> c && c.Count == 0)
+			return (random ?? R.Value).Next(source.Length);
+
+		// A DeferredHashSet fills itself lazily during Contains, so its Count is
+		// meaningless until it has been pumped: the Count==0/Count==1 fast paths below
+		// may only be taken for an already-materialized set. (Previously every lazily
+		// created set reported Count==0 here and the entire exclusion was ignored.)
+		var materialized = exclusion as ISet<T>;
+		DeferredHashSet<T>? deferred = materialized is null ? new DeferredHashSet<T>(exclusion) : null;
 		try
 		{
-			var exclusionSet = exclusion == null || exclusion is ICollection<T> c && c.Count == 0 ? default
-				: exclusion as ISet<T> ?? (setCreated = new DeferredHashSet<T>(exclusion));
+			if (materialized is not null)
+			{
+				if (materialized.Count == 0)
+					return (random ?? R.Value).Next(source.Length);
 
-			if (exclusionSet == null || exclusionSet.Count == 0)
-				return (random ?? R.Value).Next(source.Length);
-
-			if (exclusionSet.Count == 1)
-				return RandomSelectIndexExcept(in source, random, exclusionSet.Single());
+				if (materialized.Count == 1)
+					return RandomSelectIndexExcept(in source, random, materialized.Single());
+			}
 
 			var count = source.Length;
 			var pool = ArrayPool<int>.Shared;
@@ -154,7 +176,25 @@ public static class Randomizer
 				var indexCount = 0;
 				for (var i = 0; i < count; ++i)
 				{
-					if (!exclusionSet.Contains(source[i]))
+					bool excluded;
+					if (deferred is not null)
+					{
+						// The deferred set must be called through its concrete type:
+						// its Contains hides (new) rather than overrides the base method,
+						// so an ISet<T>-typed call would bypass the lazy pump entirely.
+						excluded = deferred.Contains(source[i]);
+					}
+					else if (materialized is not null)
+					{
+						excluded = materialized.Contains(source[i]);
+					}
+					else
+					{
+						Debug.Fail("Unreachable: deferred and materialized are constructed as complements.");
+						excluded = false;
+					}
+
+					if (!excluded)
 						indexes[indexCount++] = i;
 				}
 
@@ -168,7 +208,7 @@ public static class Randomizer
 		}
 		finally
 		{
-			setCreated?.Dispose();
+			deferred?.Dispose();
 		}
 	}
 
@@ -202,7 +242,10 @@ public static class Randomizer
 			return RandomSelectIndex(in source, random, others.Prepend(excluding));
 
 		var pool = ArrayPool<int>.Shared;
-		var indexes = pool.Rent(others.Length);
+		// Rent enough for every candidate index. (Previously this rented
+		// others.Length -- zero on this path -- and ArrayPool.Rent(0) returns an
+		// empty array, so any non-empty source threw IndexOutOfRangeException.)
+		var indexes = pool.Rent(source.Length);
 		try
 		{
 			var i = -1;
@@ -215,7 +258,7 @@ public static class Randomizer
 					indexes[indexCount++] = i;
 			}
 
-			return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
+			return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
 		}
 		finally
 		{
@@ -288,17 +331,23 @@ public static class Randomizer
 		if (count == 0)
 			return -1;
 
-		DeferredHashSet<T>? setCreated = null;
+		if (exclusion is null || exclusion is ICollection<T> c && c.Count == 0)
+			return (random ?? R.Value).Next(count);
+
+		// See the span overload: Count fast paths are only valid for a materialized set;
+		// a DeferredHashSet must be consulted through its concrete type.
+		var materialized = exclusion as ISet<T>;
+		DeferredHashSet<T>? deferred = materialized is null ? new DeferredHashSet<T>(exclusion) : null;
 		try
 		{
-			var exclusionSet = exclusion == null ? default
-				: exclusion as ISet<T> ?? (setCreated = new DeferredHashSet<T>(exclusion));
+			if (materialized is not null)
+			{
+				if (materialized.Count == 0)
+					return (random ?? R.Value).Next(count);
 
-			if (exclusionSet == null || exclusionSet.Count == 0)
-				return (random ?? R.Value).Next(count);
-
-			if (exclusionSet.Count == 1)
-				return RandomSelectIndexExcept(random, count, source, exclusionSet.Single());
+				if (materialized.Count == 1)
+					return RandomSelectIndexExcept(random, count, source, materialized.Single());
+			}
 
 			var pool = ArrayPool<int>.Shared;
 			var indexes = pool.Rent(count);
@@ -309,7 +358,23 @@ public static class Randomizer
 				foreach (var value in source)
 				{
 					++i;
-					if (!exclusionSet.Contains(value))
+					bool excluded;
+					if (deferred is not null)
+					{
+						// Concrete-type call so the lazy pump binds (Contains hides, not overrides).
+						excluded = deferred.Contains(value);
+					}
+					else if (materialized is not null)
+					{
+						excluded = materialized.Contains(value);
+					}
+					else
+					{
+						Debug.Fail("Unreachable: deferred and materialized are constructed as complements.");
+						excluded = false;
+					}
+
+					if (!excluded)
 						indexes[indexCount++] = i;
 				}
 
@@ -322,7 +387,7 @@ public static class Randomizer
 		}
 		finally
 		{
-			setCreated?.Dispose();
+			deferred?.Dispose();
 		}
 	}
 
@@ -348,7 +413,7 @@ public static class Randomizer
 					indexes[indexCount++] = i;
 			}
 
-			return indexCount == 0 ? -1 : indexes[R.Value.Next(indexCount)];
+			return indexCount == 0 ? -1 : indexes[(random ?? R.Value).Next(indexCount)];
 		}
 		finally
 		{
@@ -405,14 +470,14 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this in ReadOnlySpan<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 	{
 		var index = RandomSelectIndex(in source, random, exclusion);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -431,7 +496,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this in ReadOnlySpan<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		IEnumerable<T> exclusion)
 		=> TryRandomSelectOne(in source, out value, null, exclusion);
 
@@ -447,7 +512,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this in Span<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 		=> TryRandomSelectOne((ReadOnlySpan<T>)source, out value, random, exclusion);
@@ -463,7 +528,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this in Span<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		IEnumerable<T> exclusion)
 		=> TryRandomSelectOne((ReadOnlySpan<T>)source, out value, null, exclusion);
 
@@ -523,14 +588,14 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this IReadOnlyCollection<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random = null,
 		IEnumerable<T>? exclusion = null)
 	{
 		var index = RandomSelectIndex(random, source.Count, source, exclusion);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -550,7 +615,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOne<T>(
 		this IReadOnlyCollection<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		IEnumerable<T> exclusion)
 		=> TryRandomSelectOne(source, out value, default, exclusion);
 
@@ -567,14 +632,14 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this in ReadOnlySpan<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random,
 		T excluding, params T[] others)
 	{
 		var index = RandomSelectIndexExcept(in source, random, excluding, others);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -594,7 +659,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this in ReadOnlySpan<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		T excluding, params T[] others)
 		=> TryRandomSelectOneExcept(in source, out value, default, excluding, others);
 
@@ -610,7 +675,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this in Span<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random,
 		T excluding, params T[] others)
 		=> TryRandomSelectOneExcept((ReadOnlySpan<T>)source, out value, random, excluding, others);
@@ -628,14 +693,14 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this IReadOnlyCollection<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		Random? random,
 		T excluding, params T[] others)
 	{
 		var index = RandomSelectIndexExcept(random, source.Count, source, excluding, others);
 		if (index == -1)
 		{
-			value = default!;
+			value = default;
 			return false;
 		}
 
@@ -656,7 +721,7 @@ public static class Randomizer
 	/// <returns>True if a valid value was selected.</returns>
 	public static bool TryRandomSelectOneExcept<T>(
 		this IReadOnlyCollection<T> source,
-		out T value,
+		[MaybeNullWhen(false)] out T value,
 		T excluding, params T[] others)
 		=> TryRandomSelectOneExcept(source, out value, default, excluding, others);
 
@@ -676,7 +741,7 @@ public static class Randomizer
 		T excluding, params T[] others)
 		=> source.Length == 0
 			? throw new InvalidOperationException("Source collection is empty.")
-			: TryRandomSelectOneExcept(in source, out T value, random, excluding, others)
+			: TryRandomSelectOneExcept(in source, out var value, random, excluding, others)
 			? value
 			: throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
 
@@ -740,7 +805,7 @@ public static class Randomizer
 		T excluding, params T[] others)
 		=> source.Count == 0
 			? throw new InvalidOperationException("Source collection is empty.")
-			: source.TryRandomSelectOneExcept(out T value, random, excluding, others)
+			: source.TryRandomSelectOneExcept(out var value, random, excluding, others)
 			? value
 			: throw new InvalidOperationException("Exclusion set invalidates the source.  No possible value can be selected.");
 
@@ -771,13 +836,16 @@ public static class Randomizer
 		if (range == 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
-		DeferredHashSet<ushort>? setCreated = null;
+		if (exclusion is null)
+			return (ushort)source.Next(range);
+
+		// See RandomSelectIndex: Count fast paths are only valid for a materialized set,
+		// and a DeferredHashSet must be consulted through its concrete type.
+		var materialized = exclusion as ISet<ushort>;
+		DeferredHashSet<ushort>? deferred = materialized is null ? new DeferredHashSet<ushort>(exclusion) : null;
 		try
 		{
-			var exclusionSet = exclusion == null ? null
-				: exclusion as ISet<ushort> ?? (setCreated = new DeferredHashSet<ushort>(exclusion));
-
-			if (exclusionSet == null || exclusionSet.Count == 0)
+			if (materialized is not null && materialized.Count == 0)
 				return (ushort)source.Next(range);
 
 			var pool = ArrayPool<ushort>.Shared;
@@ -787,7 +855,23 @@ public static class Randomizer
 				var indexCount = 0;
 				for (ushort i = 0; i < range; ++i)
 				{
-					if (!exclusionSet.Contains(i))
+					bool excluded;
+					if (deferred is not null)
+					{
+						// Concrete-type call so the lazy pump binds (Contains hides, not overrides).
+						excluded = deferred.Contains(i);
+					}
+					else if (materialized is not null)
+					{
+						excluded = materialized.Contains(i);
+					}
+					else
+					{
+						Debug.Fail("Unreachable: deferred and materialized are constructed as complements.");
+						excluded = false;
+					}
+
+					if (!excluded)
 						indexes[indexCount++] = i;
 				}
 
@@ -802,7 +886,7 @@ public static class Randomizer
 		}
 		finally
 		{
-			setCreated?.Dispose();
+			deferred?.Dispose();
 		}
 	}
 
@@ -819,13 +903,16 @@ public static class Randomizer
 		if (range <= 0)
 			throw new ArgumentOutOfRangeException(nameof(range), range, "Must be a number greater than zero.");
 
-		DeferredHashSet<int>? setCreated = null;
+		if (exclusion is null)
+			return source.Next(range);
+
+		// See RandomSelectIndex: Count fast paths are only valid for a materialized set,
+		// and a DeferredHashSet must be consulted through its concrete type.
+		var materialized = exclusion as ISet<int>;
+		DeferredHashSet<int>? deferred = materialized is null ? new DeferredHashSet<int>(exclusion) : null;
 		try
 		{
-			var exclusionSet = exclusion == null ? null
-				: exclusion as ISet<int> ?? (setCreated = new DeferredHashSet<int>(exclusion));
-
-			if (exclusionSet == null || exclusionSet.Count == 0)
+			if (materialized is not null && materialized.Count == 0)
 				return source.Next(range);
 
 			var pool = ArrayPool<int>.Shared;
@@ -835,7 +922,23 @@ public static class Randomizer
 				var indexCount = 0;
 				for (var i = 0; i < range; ++i)
 				{
-					if (!exclusionSet.Contains(i))
+					bool excluded;
+					if (deferred is not null)
+					{
+						// Concrete-type call so the lazy pump binds (Contains hides, not overrides).
+						excluded = deferred.Contains(i);
+					}
+					else if (materialized is not null)
+					{
+						excluded = materialized.Contains(i);
+					}
+					else
+					{
+						Debug.Fail("Unreachable: deferred and materialized are constructed as complements.");
+						excluded = false;
+					}
+
+					if (!excluded)
 						indexes[indexCount++] = i;
 				}
 
@@ -850,7 +953,7 @@ public static class Randomizer
 		}
 		finally
 		{
-			setCreated?.Dispose();
+			deferred?.Dispose();
 		}
 	}
 
@@ -893,7 +996,9 @@ public static class Randomizer
 		var exInt = excluding > int.MaxValue ? -1 : (int)excluding;
 		return others.Length == 0
 			? NextExcluding(source, range, exInt)
+			// Select, not Cast: LINQ's Cast<int>() unboxes, and a boxed uint cannot
+			// unbox to int, so Cast threw InvalidCastException for any 'others'.
 			: NextExcluding(source, range,
-				others.Where(v => v <= int.MaxValue).Cast<int>().Prepend(exInt));
+				others.Where(v => v <= int.MaxValue).Select(v => (int)v).Prepend(exInt));
 	}
 }
